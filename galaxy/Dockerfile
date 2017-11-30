@@ -72,8 +72,8 @@ RUN echo "force-unsafe-io" > /etc/dpkg/dpkg.cfg.d/02apt-speedup && \
     apt-add-repository -y ppa:galaxyproject/nginx && \
     apt-get update -qq && apt-get upgrade -y && \
     apt-get install --no-install-recommends -y postgresql-9.3 sudo python-virtualenv \
-    nginx-extras=1.4.6-1ubuntu3.8ppa1 nginx-common=1.4.6-1ubuntu3.8ppa1 docker-ce=17.09.0~ce-0~ubuntu slurm-llnl slurm-llnl-torque \
-    slurm-drmaa-dev proftpd proftpd-mod-pgsql libyaml-dev nodejs-legacy npm ansible munge libmunge-dev \
+    nginx-extras=1.4.6-1ubuntu3.8ppa1 nginx-common=1.4.6-1ubuntu3.8ppa1 docker-ce=17.09.0~ce-0~ubuntu \
+    proftpd proftpd-mod-pgsql libyaml-dev nodejs-legacy npm ansible munge libmunge-dev \
     nano vim curl python-crypto python-pip python-psutil condor python-ldap autofs \
     gridengine-common gridengine-drmaa1.0 rabbitmq-server libswitch-perl unattended-upgrades supervisor samtools && \
     # install and remove supervisor, so get the service config file
@@ -104,6 +104,22 @@ RUN mkdir $GALAXY_ROOT && \
     $GALAXY_VIRTUAL_ENV/bin/pip2 install pip --upgrade && \
     $GALAXY_VIRTUAL_ENV/bin/pip2 install --extra-index-url https://wheels.galaxyproject.org/ uwsgi -v --pre && \
     rm -rf ~/.cache/
+
+# installing more recend SLURM
+RUN wget -q https://download.schedmd.com/slurm/slurm-16.05.11.tar.bz2 && \
+    tar xf slurm-16.05.11.tar.bz2 && \
+    cd slurm-16.05.11 && \
+    ./configure --prefix=/usr --sysconfdir=/etc/slurm-llnl --with-munge=/usr && \
+    make && \
+    make install && \
+    cd .. && \
+    wget -q http://apps.man.poznan.pl/trac/slurm-drmaa/downloads/9 && \
+    tar xf 9 && \
+    cd slurm-drmaa-1.0.7 && \
+    ./configure --with-slurm-inc=/usr/include --with-slurm-lib=/usr/lib --sysconfdir=/etc && \
+    make && \
+    make install && \
+    rm -rf /9 /slurm*
 
 RUN su $GALAXY_USER -c "cp $GALAXY_ROOT/config/galaxy.ini.sample $GALAXY_CONFIG_FILE"
 ADD ./reports_wsgi.ini.sample $GALAXY_CONFIG_DIR/reports_wsgi.ini
