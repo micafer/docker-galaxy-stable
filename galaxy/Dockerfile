@@ -65,8 +65,6 @@ RUN echo "force-unsafe-io" > /etc/dpkg/dpkg.cfg.d/02apt-speedup && \
     apt-get -qq update && apt-get install --no-install-recommends -y apt-transport-https software-properties-common wget && \
     apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys 58118E89F3A912897C070ADBF76221572C52609D && \
     sh -c "wget -qO - https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -" && \
-    sh -c "echo deb http://research.cs.wisc.edu/htcondor/ubuntu/stable/ trusty contrib > /etc/apt/sources.list.d/htcondor.list" && \
-    sh -c "wget -qO - http://research.cs.wisc.edu/htcondor/ubuntu/HTCondor-Release.gpg.key | sudo apt-key add -" && \
     add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" && \
     apt-add-repository -y ppa:ansible/ansible && \
     apt-add-repository -y ppa:galaxyproject/nginx && \
@@ -74,7 +72,7 @@ RUN echo "force-unsafe-io" > /etc/dpkg/dpkg.cfg.d/02apt-speedup && \
     apt-get install --no-install-recommends -y postgresql-9.3 sudo python-virtualenv \
     nginx-extras=1.4.6-1ubuntu3.8ppa1 nginx-common=1.4.6-1ubuntu3.8ppa1 docker-ce=17.09.0~ce-0~ubuntu \
     proftpd proftpd-mod-pgsql libyaml-dev nodejs-legacy npm ansible munge libmunge-dev \
-    nano vim curl python-crypto python-pip python-psutil condor python-ldap autofs \
+    nano vim curl python-crypto python-pip python-psutil python-ldap autofs \
     gridengine-common gridengine-drmaa1.0 rabbitmq-server libswitch-perl unattended-upgrades supervisor samtools && \
     # install and remove supervisor, so get the service config file
     apt-get -qq remove -y supervisor && \
@@ -88,8 +86,7 @@ RUN echo "force-unsafe-io" > /etc/dpkg/dpkg.cfg.d/02apt-speedup && \
 RUN groupadd -r $GALAXY_USER -g $GALAXY_GID && \
     useradd -u $GALAXY_UID -r -g $GALAXY_USER -d $GALAXY_HOME -c "Galaxy user" $GALAXY_USER && \
     mkdir $EXPORT_DIR $GALAXY_HOME $GALAXY_LOGS_DIR && chown -R $GALAXY_USER:$GALAXY_USER $GALAXY_HOME $EXPORT_DIR $GALAXY_LOGS_DIR && \
-    gpasswd -a $GALAXY_USER docker && \
-    adduser condor docker
+    gpasswd -a $GALAXY_USER docker 
 ADD ./bashrc $GALAXY_HOME/.bashrc
 
 # Download latest stable release of Galaxy.
@@ -139,8 +136,8 @@ RUN ansible-playbook /ansible/postgresql_provision.yml && \
     --extra-vars galaxy_job_conf_path=$GALAXY_CONFIG_JOB_CONFIG_FILE \
     --extra-vars galaxy_job_metrics_conf_path=$GALAXY_CONFIG_JOB_METRICS_CONFIG_FILE \
     --extra-vars supervisor_manage_slurm="" \
-    --extra-vars galaxy_extras_config_condor=True \
-    --extra-vars galaxy_extras_config_condor_docker=True \
+    --extra-vars galaxy_extras_config_condor=False \
+    --extra-vars galaxy_extras_config_condor_docker=False \
     --extra-vars galaxy_extras_config_rabbitmq=True \
     --extra-vars galaxy_extras_config_cvmfs=True \
     --extra-vars proftpd_db_connection=galaxy@galaxy \
@@ -241,9 +238,6 @@ ADD install_tools_wrapper.sh /usr/bin/install-tools
 # script to install BioJS visualizations
 ADD install_biojs_vis.sh /usr/bin/install-biojs
 RUN chmod +x /usr/bin/install-tools /usr/bin/install-biojs
-
-RUN echo "DISCARD_SESSION_KEYRING_ON_STARTUP=False" > /etc/condor/condor_config.local && \
-    echo "TRUST_UID_DOMAIN=true" >> /etc/condor/condor_config.local
 
 # This needs to happen here and not above, otherwise the Galaxy start
 # (without running the startup.sh script) will crash because integrated_tool_panel.xml could not be found.
