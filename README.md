@@ -5,10 +5,22 @@
 ![docker pulls](https://img.shields.io/docker/pulls/bgruening/galaxy-stable.svg) ![docker stars](https://img.shields.io/docker/stars/bgruening/galaxy-stable.svg)
 [![docker image stats](https://images.microbadger.com/badges/image/bgruening/galaxy-stable.svg)](https://microbadger.com/images/bgruening/galaxy-stable "Get your own image badge on microbadger.com")
 
+
+:information_source: `19.01` will be the last release which is based on `ubuntu:14.04` and
+PostgreSQL 9.3. We will migrate to `ubuntu:18.04` and a newer PostgreSQL version in `19.05`. Furthermore, we will not
+support old Galaxy tool dependencies. These are deprecated since a few years and we think its time to remove support
+for this in the default installation. You can install all needed packages manually to enable support again, though.
+
+In short, with 19.05:
+  * Galaxy tool dependencies will not be supported by default
+  * `ubuntu:18.04` will be the new base image
+  * a new PostgreSQL version means you need to migrate any old database to the new version
+
+
 Galaxy Docker Image
 ===================
 
-The [Galaxy](http://www.galaxyproject.org) [Docker](http://www.docker.io) Image is an easy distributable full-fledged Galaxy installation, that can be used for testing, teaching and presenting new tools and features.
+The [Galaxy](http://www.galaxyproject.org) [Docker](http://www.docker.io) Image is an easy distributable full-fledged Galaxy installation, that can be used for testing, teaching and presenting new tools and features. 
 
 One of the main goals is to make the access to entire tool suites as easy as possible. Usually,
 this includes the setup of a public available web-service that needs to be maintained, or that the Tool-user needs to either setup a Galaxy Server by its own or to have Admin access to a local Galaxy server.
@@ -17,7 +29,6 @@ With docker, tool developers can create their own Image with all dependencies an
 The Image is based on [Ubuntu 14.04 LTS](http://releases.ubuntu.com/14.04/) and all recommended Galaxy requirements are installed. The following chart should illustrate the [Docker](http://www.docker.io) image hierarchy we have build to make is as easy as possible to build on different layers of our stack and create many exciting Galaxy flavors.
 
 ![Docker hierarchy](https://raw.githubusercontent.com/bgruening/docker-galaxy-stable/master/chart.png)
-
 
 # Table of Contents <a name="toc" />
 
@@ -54,6 +65,7 @@ The Image is based on [Ubuntu 14.04 LTS](http://releases.ubuntu.com/14.04/) and 
 
 
 # Usage <a name="Usage" /> [[toc]](#toc)
+This chapter explains how to launch the container manually. An [ansible](https://www.ansible.com/) playbook that launches the container automatically is available [here](https://github.com/LUMC/galaxy-launcher).
 
 At first you need to install docker. Please follow the [very good instructions](https://docs.docker.com/installation/) from the Docker project.
 
@@ -678,6 +690,8 @@ https://github.com/bgruening/galaxy-flavor-testing
 
 ## List of Galaxy flavours <a name="List-of-Galaxy-flavours" /> [[toc]](#toc)
 
+- [Aurora Galaxy](https://github.com/statonlab/aurora-galaxy-tools)
+- [SNP analysis Workflows on Docker (sniplay)](https://github.com/ValentinMarcon/docker-galaxy-sniplay)
 - [NCBI-Blast](https://github.com/bgruening/docker-galaxy-blast)
 - [ChemicalToolBox](https://github.com/bgruening/docker-recipes/blob/master/galaxy-chemicaltoolbox)
 - [ballaxy](https://github.com/anhi/docker-scripts/tree/master/ballaxy)
@@ -813,7 +827,24 @@ If you simply want to change the Galaxy repository and/or the Galaxy branch, fro
    - Singularity support and tests (compose only)
    - more work on K8s support and testing (@jmchilton)
    - using .env files to configure the compose setup for SLURM, Condor, K8s, SLURM-Singularity, Condor-Docker
-
+- 18.01:
+   - tracking the Galaxy release_18.01 branch
+   - uwsgi work to adopt to changes for 18.01
+   - remove nodejs-legacy & npm from Dockerfile and install latest version from ansible-extras
+   - initial galaxy.ini → galaxy.yml integration 
+   - grafana and influxdb container (compose)
+   - Galaxy telegraf integration to push to influxdb (compose)
+   - added some documentation (compose)
+- 18.05:
+   - Nothing very special, but a awesome Galaxy release as usual
+- 18.09:
+   - new and more powerful orchestration build script (build-orchestration-images.sh) by @pcm32
+   - a lot of bug-fixes to the compose setup by @abretaud
+- 19.01:
+   - This is featuring the latest and greatest from the Galaxy community
+   - Please note that this release will be the last release which is based on `ubuntu:14.04` and PostgreSQL 9.3. 
+     We will migrate to `ubuntu:18.04` and a newer PostgreSQL version in `19.05`. Furthermore, we will not
+     support old Galaxy tool dependencies. 
 
 # Support & Bug Reports <a name="Support-Bug-Reports" /> [[toc]](#toc)
 

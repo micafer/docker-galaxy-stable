@@ -9,17 +9,18 @@ MAINTAINER Björn A. Grüning, bjoern.gruening@gmail.com
 ARG GALAXY_RELEASE
 ARG GALAXY_REPO
 
-ENV GALAXY_RELEASE=${GALAXY_RELEASE:-release_17.09} \
+ENV GALAXY_RELEASE=${GALAXY_RELEASE:-release_19.01} \
 GALAXY_REPO=${GALAXY_REPO:-https://github.com/galaxyproject/galaxy} \
 GALAXY_ROOT=/galaxy-central \
 GALAXY_CONFIG_DIR=/etc/galaxy \
 EXPORT_DIR=/export \
 DEBIAN_FRONTEND=noninteractive
 
-ENV GALAXY_CONFIG_FILE=$GALAXY_CONFIG_DIR/galaxy.ini \
+ENV GALAXY_CONFIG_FILE=$GALAXY_CONFIG_DIR/galaxy.yml \
 GALAXY_CONFIG_JOB_CONFIG_FILE=$GALAXY_CONFIG_DIR/job_conf.xml \
 GALAXY_CONFIG_JOB_METRICS_CONFIG_FILE=$GALAXY_CONFIG_DIR/job_metrics_conf.xml \
 GALAXY_CONFIG_TOOL_DATA_TABLE_CONFIG_PATH=/etc/galaxy/tool_data_table_conf.xml \
+GALAXY_CONFIG_WATCH_TOOL_DATA_DIR=True \
 GALAXY_CONFIG_TOOL_DEPENDENCY_DIR=$EXPORT_DIR/tool_deps \
 GALAXY_CONFIG_TOOL_PATH=$EXPORT_DIR/galaxy-central/tools \
 GALAXY_VIRTUAL_ENV=/galaxy_venv \
@@ -52,7 +53,8 @@ GALAXY_CONFIG_GALAXY_INFRASTRUCTURE_URL=http://localhost \
 GALAXY_HANDLER_NUMPROCS=2 \
 # Setting a standard encoding. This can get important for things like the unix sort tool.
 LC_ALL=en_US.UTF-8 \
-LANG=en_US.UTF-8
+LANG=en_US.UTF-8 \
+GALAXY_CONDA_PREFIX=$GALAXY_CONFIG_TOOL_DEPENDENCY_DIR/_conda
 
 RUN locale-gen en_US.UTF-8 && dpkg-reconfigure locales
 
@@ -63,7 +65,6 @@ RUN groupadd -r postgres -g $GALAXY_POSTGRES_GID && \
 RUN echo "force-unsafe-io" > /etc/dpkg/dpkg.cfg.d/02apt-speedup && \
     echo "Acquire::http {No-Cache=True;};" > /etc/apt/apt.conf.d/no-cache && \
     apt-get -qq update && apt-get install --no-install-recommends -y apt-transport-https software-properties-common wget && \
-    apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys 58118E89F3A912897C070ADBF76221572C52609D && \
     sh -c "wget -qO - https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -" && \
     sh -c "echo deb http://research.cs.wisc.edu/htcondor/ubuntu/stable/ trusty contrib > /etc/apt/sources.list.d/htcondor.list" && \
     sh -c "wget -qO - http://research.cs.wisc.edu/htcondor/ubuntu/HTCondor-Release.gpg.key | sudo apt-key add -" && \
@@ -72,8 +73,8 @@ RUN echo "force-unsafe-io" > /etc/dpkg/dpkg.cfg.d/02apt-speedup && \
     apt-add-repository -y ppa:galaxyproject/nginx && \
     apt-get update -qq && apt-get upgrade -y && \
     apt-get install --no-install-recommends -y postgresql-9.3 sudo python-virtualenv \
-    nginx-extras=1.4.6-1ubuntu3.8ppa1 nginx-common=1.4.6-1ubuntu3.8ppa1 docker-ce=17.09.0~ce-0~ubuntu \
-    proftpd proftpd-mod-pgsql libyaml-dev nodejs-legacy npm ansible munge libmunge-dev \
+    nginx-extras=1.4.6-1ubuntu3.8ppa1 nginx-common=1.4.6-1ubuntu3.8ppa1 docker-ce=17.09.0~ce-0~ubuntu slurm-llnl slurm-llnl-torque \
+    slurm-drmaa-dev proftpd proftpd-mod-pgsql libyaml-dev nodejs-legacy npm ansible munge libmunge-dev \
     nano vim curl python-crypto python-pip python-psutil condor python-ldap autofs \
     gridengine-common gridengine-drmaa1.0 rabbitmq-server libswitch-perl unattended-upgrades supervisor samtools && \
     # install and remove supervisor, so get the service config file
@@ -83,6 +84,7 @@ RUN echo "force-unsafe-io" > /etc/dpkg/dpkg.cfg.d/02apt-speedup && \
     mkdir -p /etc/supervisor/conf.d/ /var/log/supervisor/ && \
     pip install --upgrade pip && \
     pip install ephemeris supervisor --upgrade && \
+    rm -rf ~/.cache/ /galaxy-central/client/node_modules/ && \
     ln -s /usr/local/bin/supervisord /usr/bin/supervisord
 
 RUN groupadd -r $GALAXY_USER -g $GALAXY_GID && \
@@ -90,10 +92,22 @@ RUN groupadd -r $GALAXY_USER -g $GALAXY_GID && \
     mkdir $EXPORT_DIR $GALAXY_HOME $GALAXY_LOGS_DIR && chown -R $GALAXY_USER:$GALAXY_USER $GALAXY_HOME $EXPORT_DIR $GALAXY_LOGS_DIR && \
     gpasswd -a $GALAXY_USER docker && \
     adduser condor docker
+
 ADD ./bashrc $GALAXY_HOME/.bashrc
 
-# Download latest stable release of Galaxy.
-RUN mkdir $GALAXY_ROOT && \
+# Install miniconda, then virtualenv from conda and then
+# download latest stable release of Galaxy.
+RUN wget --quiet https://repo.anaconda.com/miniconda/Miniconda2-4.5.12-Linux-x86_64.sh -O ~/miniconda.sh && \
+    /bin/bash ~/miniconda.sh -b -p /tool_deps/_conda/ && \
+    rm ~/miniconda.sh && \
+    ln -s /tool_deps/_conda/etc/profile.d/conda.sh /etc/profile.d/conda.sh && \
+    echo ". /tool_deps/_conda/etc/profile.d/conda.sh" >> $GALAXY_HOME/.bashrc && \
+    echo "conda activate base" >> $GALAXY_HOME/.bashrc && \
+    export PATH=/tool_deps/_conda/bin/:$PATH && \
+    conda install virtualenv pip && \
+    # conda install conda-canary::conda=4.6 && \
+    chown $GALAXY_USER:$GALAXY_USER -R /tool_deps/ /etc/profile.d/conda.sh && \
+    mkdir $GALAXY_ROOT && \
     wget -q -O - $GALAXY_REPO/archive/$GALAXY_RELEASE.tar.gz | tar xzf - --strip-components=1 -C $GALAXY_ROOT && \
     virtualenv $GALAXY_VIRTUAL_ENV && \
     chown -R $GALAXY_USER:$GALAXY_USER $GALAXY_VIRTUAL_ENV && \
@@ -102,8 +116,10 @@ RUN mkdir $GALAXY_ROOT && \
     mkdir -p $GALAXY_CONFIG_DIR $GALAXY_CONFIG_DIR/web && \
     chown -R $GALAXY_USER:$GALAXY_USER $GALAXY_CONFIG_DIR && \
     $GALAXY_VIRTUAL_ENV/bin/pip2 install pip --upgrade && \
-    $GALAXY_VIRTUAL_ENV/bin/pip2 install --extra-index-url https://wheels.galaxyproject.org/ uwsgi -v --pre && \
-    rm -rf ~/.cache/
+    $GALAXY_VIRTUAL_ENV/bin/pip2 install --extra-index-url https://wheels.galaxyproject.org/ uwsgi==2.0.15 -v --pre && \
+    chown -R $GALAXY_USER:$GALAXY_USER $GALAXY_VIRTUAL_ENV && \
+    rm -rf ~/.cache/ /galaxy-central/client/node_modules/ && \
+    su $GALAXY_USER -c "cp $GALAXY_ROOT/config/galaxy.yml.sample $GALAXY_CONFIG_FILE"
 
 # installing more recend SLURM
 RUN wget -q https://download.schedmd.com/slurm/slurm-16.05.11.tar.bz2 && \
@@ -123,7 +139,6 @@ RUN wget -q https://download.schedmd.com/slurm/slurm-16.05.11.tar.bz2 && \
 
 RUN su $GALAXY_USER -c "cp $GALAXY_ROOT/config/galaxy.ini.sample $GALAXY_CONFIG_FILE"
 ADD ./reports_wsgi.ini.sample $GALAXY_CONFIG_DIR/reports_wsgi.ini
-
 ADD sample_tool_list.yaml $GALAXY_HOME/ephemeris/sample_tool_list.yaml
 ADD roles/ /ansible/roles
 ADD provision.yml /ansible/provision.yml
@@ -147,17 +162,17 @@ RUN ansible-playbook /ansible/postgresql_provision.yml && \
     --extra-vars proftpd_files_dir=$EXPORT_DIR/ftp \
     --extra-vars proftpd_use_sftp=True \
     --extra-vars galaxy_extras_docker_legacy=False \
-    --extra-vars galaxy_minimum_version=17.09 \
-    --extra-vars nginx_upload_store_path=$EXPORT_DIR/nginx_upload_store \
+    --extra-vars galaxy_minimum_version=18.01 \
     --extra-vars supervisor_postgres_config_path=$PG_CONF_DIR_DEFAULT/postgresql.conf \
     --extra-vars supervisor_postgres_autostart=false \
     --extra-vars nginx_use_remote_header=True \
     --tags=galaxyextras,cvmfs -c local && \
-    apt-get autoremove -y && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+    apt-get autoremove -y && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
+    rm -rf ~/.cache/ /galaxy-central/client/node_modules/
 
 RUN mkdir /shed_tools && chown $GALAXY_USER:$GALAXY_USER /shed_tools && \
     mkdir $EXPORT_DIR/ftp/ && chown $GALAXY_USER:$GALAXY_USER $EXPORT_DIR/ftp && \
-    mkdir /tool_deps/ && chown $GALAXY_USER:$GALAXY_USER /tool_deps && \
+    mkdir -p /tool_deps/ && chown $GALAXY_USER:$GALAXY_USER -R /tool_deps && \
     ln -s /tool_deps/ $EXPORT_DIR/tool_deps && chown $GALAXY_USER:$GALAXY_USER $EXPORT_DIR/tool_deps # Configure Galaxy to use the Tool Shed
 
 # The following commands will be executed as the galaxy user
@@ -184,8 +199,6 @@ GALAXY_CONFIG_FTP_UPLOAD_SITE=galaxy.docker.org \
 GALAXY_CONFIG_USE_PBKDF2=False \
 GALAXY_CONFIG_NGINX_X_ACCEL_REDIRECT_BASE=/_x_accel_redirect \
 GALAXY_CONFIG_NGINX_X_ARCHIVE_FILES_BASE=/_x_accel_redirect \
-GALAXY_CONFIG_NGINX_UPLOAD_STORE=$EXPORT_DIR/nginx_upload_store \
-GALAXY_CONFIG_NGINX_UPLOAD_PATH=/_upload \
 GALAXY_CONFIG_DYNAMIC_PROXY_MANAGE=False \
 GALAXY_CONFIG_VISUALIZATION_PLUGINS_DIRECTORY=config/plugins/visualizations \
 GALAXY_CONFIG_TRUST_IPYTHON_NOTEBOOK_CONVERSION=True \
@@ -204,14 +217,15 @@ ADD GalaxyDocker.png $GALAXY_CONFIG_DIR/web/welcome_image.png
 ADD welcome.html $GALAXY_CONFIG_DIR/web/welcome.html
 
 RUN ./scripts/common_startup.sh && \
+    export PATH=GALAXY_CONDA_PREFIX/bin/:$PATH && \
     . $GALAXY_VIRTUAL_ENV/bin/activate && \
     python ./scripts/manage_tool_dependencies.py -c "$GALAXY_CONFIG_FILE" init_if_needed && \
     # Install all required Node dependencies. This is required to get proxy support to work for Interactive Environments
     cd $GALAXY_ROOT/lib/galaxy/web/proxy/js && \
-    npm install
-
-# the following can be removed with 18.01
-RUN /tool_deps/_conda/bin/conda create -y --override-channels --channel iuc --channel bioconda --channel conda-forge --channel defaults --channel r --name mulled-v1-eb2018fd3ce0fcbcee48a4bf89c57219add691c16729281b6c46b30f08339397 samtools=1.3.1 bcftools=1.5
+    npm install && \
+    rm -rf ~/.cache/ /galaxy-central/client/node_modules/ && \
+    # change the default location of shed_tools to be ../shed_tools
+    sed -i 's|database|..|' $GALAXY_ROOT/config/shed_tool_conf.xml
 
 # Switch back to User root
 USER root
@@ -240,7 +254,9 @@ ADD ./tool_sheds_conf.xml $GALAXY_HOME/tool_sheds_conf.xml
 ADD install_tools_wrapper.sh /usr/bin/install-tools
 # script to install BioJS visualizations
 ADD install_biojs_vis.sh /usr/bin/install-biojs
-RUN chmod +x /usr/bin/install-tools /usr/bin/install-biojs
+RUN chmod +x /usr/bin/install-tools /usr/bin/install-biojs && \
+    cd /usr/bin/ && wget https://git.embl.de/grp-gbcs/galaxy-dir-sync/raw/master/src/galaxy-dir-sync.py && \
+    chmod +x galaxy-dir-sync.py
 
 RUN echo "DISCARD_SESSION_KEYRING_ON_STARTUP=False" > /etc/condor/condor_config.local && \
     echo "TRUST_UID_DOMAIN=true" >> /etc/condor/condor_config.local

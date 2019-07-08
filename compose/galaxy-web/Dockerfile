@@ -2,9 +2,11 @@
 #
 # VERSION       Galaxy-central
 
-FROM quay.io/bgruening/galaxy-base
+FROM quay.io/bgruening/galaxy-base:19.01
 
 MAINTAINER Björn A. Grüning, bjoern.gruening@gmail.com
+
+ARG GALAXY_ANSIBLE_TAGS=supervisor,startup,scripts,nginx,cvmfs
 
 ENV GALAXY_DESTINATIONS_DEFAULT=slurm_cluster \
 # The following 2 ENV vars can be used to set the number of uwsgi processes and threads
@@ -20,12 +22,15 @@ GALAXY_HANDLER_NUMPROCS=2
 
 RUN echo "force-unsafe-io" > /etc/dpkg/dpkg.cfg.d/02apt-speedup && \
     apt-get -qq update && apt-get install --no-install-recommends -y apt-transport-https wget && \
-    echo "deb [arch=amd64] http://ppa.launchpad.net/galaxyproject/nginx/ubuntu trusty main" > /etc/apt/sources.list.d/nginx.list && \
-    apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 9735427B && \
-    apt-get update -qq && apt-get upgrade -y && \
-    apt-get install --no-install-recommends -y \
-    slurm-drmaa-dev nginx-extras=1.4.6-1ubuntu3.8ppa1 nginx-common=1.4.6-1ubuntu3.8ppa1 supervisor \
-    slurm-llnl autofs && \
+    echo "deb https://deb.nodesource.com/node_9.x $(lsb_release -sc) main" > /etc/apt/sources.list.d/nodejs.list && \
+    apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 68576280 && \
+    apt-get update -qq && \
+    apt-get install --no-install-recommends -y nodejs \
+    nginx-extras nginx-common supervisor autofs slurm-wlm slurm-wlm-torque && \
+    wget https://depot.galaxyproject.org/deb/ubuntu/18.04/slurm-drmaa1_1.2.0-dev.deca826_amd64.deb && \
+    wget https://depot.galaxyproject.org/deb/ubuntu/18.04/slurm-drmaa-dev_1.2.0-dev.deca826_amd64.deb && \
+    dpkg -i slurm-drmaa1_1.2.0-dev.deca826_amd64.deb && \
+    dpkg -i slurm-drmaa-dev_1.2.0-dev.deca826_amd64.deb && \
     # install and remove supervisor, so get the service config file
     apt-get -qq remove -y supervisor && \
     apt-get autoremove -y && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
@@ -33,7 +38,7 @@ RUN echo "force-unsafe-io" > /etc/dpkg/dpkg.cfg.d/02apt-speedup && \
     # this can be optimised I think, we should get the SLURM client only and update it
     gpasswd -a $GALAXY_USER docker && \
     mkdir -p /etc/supervisor/conf.d/ /var/log/supervisor/ && \
-    pip install --upgrade pip && \
+    #pip install --upgrade pip && \
     pip install ephemeris supervisor --upgrade && \
     ln -s /usr/local/bin/supervisord /usr/bin/supervisord
 
@@ -52,7 +57,7 @@ RUN rm -f /usr/bin/startup && \
     --extra-vars galaxy_extras_config_proftpd=False \
     --extra-vars galaxy_extras_config_cvmfs=True \
     --extra-vars galaxy_tool_data_table_config_file=/etc/galaxy/tool_data_table_conf.xml \
-    --extra-vars nginx_upload_store_path=$GALAXY_CONFIG_NGINX_UPLOAD_STORE \
+    --extra-vars galaxy_extras_config_nginx_upload=False \
     --extra-vars nginx_welcome_location=$NGINX_WELCOME_LOCATION \
     --extra-vars nginx_welcome_path=$NGINX_WELCOME_PATH \
     --extra-vars startup_sleeplock=True \
@@ -66,7 +71,7 @@ RUN rm -f /usr/bin/startup && \
     # Used for detecting privileged mode
     --extra-vars host_docker_legacy=False \
     --extra-vars galaxy_extras_docker_legacy=False \
-    --tags=supervisor,startup,scripts,nginx,cvmfs -c local && \
+    --tags=$GALAXY_ANSIBLE_TAGS -c local && \
     apt-get autoremove -y && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 RUN chmod +x /usr/bin/startup

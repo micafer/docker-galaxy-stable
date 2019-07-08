@@ -373,6 +373,73 @@ ALTER SEQUENCE cleanup_event_metadata_file_association_id_seq OWNED BY cleanup_e
 
 
 --
+-- Name: cleanup_event_user_association; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE cleanup_event_user_association (
+    id integer NOT NULL,
+    create_time timestamp without time zone,
+    cleanup_event_id integer,
+    user_id integer
+);
+
+
+--
+-- Name: cleanup_event_user_association_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE cleanup_event_user_association_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: cleanup_event_user_association_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE cleanup_event_user_association_id_seq OWNED BY cleanup_event_user_association.id;
+
+
+--
+-- Name: cloudauthz; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE cloudauthz (
+    id integer NOT NULL,
+    user_id integer,
+    provider character varying(255),
+    config bytea,
+    authn_id integer,
+    tokens bytea,
+    last_update timestamp without time zone,
+    last_activity timestamp without time zone,
+    description text
+);
+
+
+--
+-- Name: cloudauthz_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE cloudauthz_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: cloudauthz_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE cloudauthz_id_seq OWNED BY cloudauthz.id;
+
+
+--
 -- Name: data_manager_history_association; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -467,7 +534,8 @@ CREATE TABLE dataset_collection (
     create_time timestamp without time zone,
     update_time timestamp without time zone,
     populated_state character varying(64) DEFAULT 'ok'::character varying NOT NULL,
-    populated_state_message text
+    populated_state_message text,
+    element_count integer
 );
 
 
@@ -1326,7 +1394,8 @@ CREATE TABLE history_dataset_association (
     purged boolean,
     tool_version text,
     extended_metadata_id integer,
-    hidden_beneath_collection_instance_id integer
+    hidden_beneath_collection_instance_id integer,
+    version integer
 );
 
 
@@ -1392,6 +1461,41 @@ CREATE SEQUENCE history_dataset_association_display_at_authorization_id_seq
 --
 
 ALTER SEQUENCE history_dataset_association_display_at_authorization_id_seq OWNED BY history_dataset_association_display_at_authorization.id;
+
+
+--
+-- Name: history_dataset_association_history; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE history_dataset_association_history (
+    id integer NOT NULL,
+    history_dataset_association_id integer,
+    update_time timestamp without time zone,
+    version integer,
+    name character varying(255),
+    extension character varying(64),
+    metadata bytea,
+    extended_metadata_id integer
+);
+
+
+--
+-- Name: history_dataset_association_history_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE history_dataset_association_history_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: history_dataset_association_history_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE history_dataset_association_history_id_seq OWNED BY history_dataset_association_history.id;
 
 
 --
@@ -1553,7 +1657,9 @@ CREATE TABLE history_dataset_collection_association (
     deleted boolean,
     visible boolean,
     copied_from_history_dataset_collection_association_id integer,
-    implicit_output_name character varying(255)
+    implicit_output_name character varying(255),
+    implicit_collection_jobs_id integer,
+    job_id integer
 );
 
 
@@ -1756,6 +1862,66 @@ ALTER SEQUENCE history_user_share_association_id_seq OWNED BY history_user_share
 
 
 --
+-- Name: implicit_collection_jobs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE implicit_collection_jobs (
+    id integer NOT NULL,
+    populated_state character varying(64) NOT NULL
+);
+
+
+--
+-- Name: implicit_collection_jobs_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE implicit_collection_jobs_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: implicit_collection_jobs_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE implicit_collection_jobs_id_seq OWNED BY implicit_collection_jobs.id;
+
+
+--
+-- Name: implicit_collection_jobs_job_association; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE implicit_collection_jobs_job_association (
+    implicit_collection_jobs_id integer,
+    id integer NOT NULL,
+    job_id integer,
+    order_index integer NOT NULL
+);
+
+
+--
+-- Name: implicit_collection_jobs_job_association_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE implicit_collection_jobs_job_association_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: implicit_collection_jobs_job_association_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE implicit_collection_jobs_job_association_id_seq OWNED BY implicit_collection_jobs_job_association.id;
+
+
+--
 -- Name: implicitly_converted_dataset_association; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1854,7 +2020,8 @@ CREATE TABLE job (
     exit_code integer,
     destination_id character varying(255),
     destination_params bytea,
-    dependencies bytea
+    dependencies bytea,
+    copied_from_job_id integer
 );
 
 
@@ -1990,7 +2157,7 @@ CREATE TABLE job_metric_numeric (
     job_id integer,
     plugin character varying(255),
     metric_name character varying(255),
-    metric_value numeric(22,7)
+    metric_value numeric(26,7)
 );
 
 
@@ -2148,7 +2315,8 @@ CREATE TABLE job_to_input_dataset (
     id integer NOT NULL,
     job_id integer,
     dataset_id integer,
-    name character varying(255)
+    name character varying(255),
+    dataset_version integer
 );
 
 
@@ -2937,6 +3105,40 @@ CREATE TABLE migrate_version (
 
 
 --
+-- Name: oidc_user_authnz_tokens; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE oidc_user_authnz_tokens (
+    id integer NOT NULL,
+    user_id integer,
+    uid character varying(255),
+    provider character varying(32),
+    extra_data bytea,
+    lifetime integer,
+    assoc_type character varying(64)
+);
+
+
+--
+-- Name: oidc_user_authnz_tokens_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE oidc_user_authnz_tokens_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: oidc_user_authnz_tokens_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE oidc_user_authnz_tokens_id_seq OWNED BY oidc_user_authnz_tokens.id;
+
+
+--
 -- Name: page; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -3203,6 +3405,133 @@ CREATE SEQUENCE post_job_action_id_seq
 --
 
 ALTER SEQUENCE post_job_action_id_seq OWNED BY post_job_action.id;
+
+
+--
+-- Name: psa_association; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE psa_association (
+    id integer NOT NULL,
+    server_url character varying(255),
+    handle character varying(255),
+    secret character varying(255),
+    issued integer,
+    lifetime integer,
+    assoc_type character varying(64)
+);
+
+
+--
+-- Name: psa_association_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE psa_association_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: psa_association_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE psa_association_id_seq OWNED BY psa_association.id;
+
+
+--
+-- Name: psa_code; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE psa_code (
+    id integer NOT NULL,
+    email character varying(200),
+    code character varying(32)
+);
+
+
+--
+-- Name: psa_code_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE psa_code_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: psa_code_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE psa_code_id_seq OWNED BY psa_code.id;
+
+
+--
+-- Name: psa_nonce; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE psa_nonce (
+    id integer NOT NULL,
+    server_url character varying(255),
+    "timestamp" integer,
+    salt character varying(40)
+);
+
+
+--
+-- Name: psa_nonce_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE psa_nonce_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: psa_nonce_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE psa_nonce_id_seq OWNED BY psa_nonce.id;
+
+
+--
+-- Name: psa_partial; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE psa_partial (
+    id integer NOT NULL,
+    token character varying(32),
+    data text,
+    next_step integer,
+    backend character varying(32)
+);
+
+
+--
+-- Name: psa_partial_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE psa_partial_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: psa_partial_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE psa_partial_id_seq OWNED BY psa_partial.id;
 
 
 --
@@ -3756,7 +4085,8 @@ CREATE TABLE stored_workflow (
     deleted boolean,
     importable boolean,
     slug text,
-    published boolean
+    published boolean,
+    from_path text
 );
 
 
@@ -4021,7 +4351,7 @@ CREATE TABLE task_metric_numeric (
     task_id integer,
     plugin character varying(255),
     metric_name character varying(255),
-    metric_value numeric(22,7)
+    metric_value numeric(26,7)
 );
 
 
@@ -4796,6 +5126,70 @@ ALTER SEQUENCE workflow_invocation_id_seq OWNED BY workflow_invocation.id;
 
 
 --
+-- Name: workflow_invocation_output_dataset_association; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE workflow_invocation_output_dataset_association (
+    id integer NOT NULL,
+    workflow_invocation_id integer,
+    workflow_step_id integer,
+    dataset_id integer,
+    workflow_output_id integer
+);
+
+
+--
+-- Name: workflow_invocation_output_dataset_association_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE workflow_invocation_output_dataset_association_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: workflow_invocation_output_dataset_association_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE workflow_invocation_output_dataset_association_id_seq OWNED BY workflow_invocation_output_dataset_association.id;
+
+
+--
+-- Name: workflow_invocation_output_dataset_collection_association; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE workflow_invocation_output_dataset_collection_association (
+    id integer NOT NULL,
+    workflow_invocation_id integer,
+    workflow_step_id integer,
+    dataset_collection_id integer,
+    workflow_output_id integer
+);
+
+
+--
+-- Name: workflow_invocation_output_dataset_collection_associatio_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE workflow_invocation_output_dataset_collection_associatio_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: workflow_invocation_output_dataset_collection_associatio_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE workflow_invocation_output_dataset_collection_associatio_id_seq OWNED BY workflow_invocation_output_dataset_collection_association.id;
+
+
+--
 -- Name: workflow_invocation_step; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -4806,7 +5200,9 @@ CREATE TABLE workflow_invocation_step (
     workflow_invocation_id integer NOT NULL,
     workflow_step_id integer NOT NULL,
     job_id integer,
-    action bytea
+    action bytea,
+    implicit_collection_jobs_id integer,
+    state character varying(64)
 );
 
 
@@ -4827,6 +5223,69 @@ CREATE SEQUENCE workflow_invocation_step_id_seq
 --
 
 ALTER SEQUENCE workflow_invocation_step_id_seq OWNED BY workflow_invocation_step.id;
+
+
+--
+-- Name: workflow_invocation_step_output_dataset_association; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE workflow_invocation_step_output_dataset_association (
+    id integer NOT NULL,
+    workflow_invocation_step_id integer,
+    dataset_id integer,
+    output_name character varying(255)
+);
+
+
+--
+-- Name: workflow_invocation_step_output_dataset_association_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE workflow_invocation_step_output_dataset_association_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: workflow_invocation_step_output_dataset_association_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE workflow_invocation_step_output_dataset_association_id_seq OWNED BY workflow_invocation_step_output_dataset_association.id;
+
+
+--
+-- Name: workflow_invocation_step_output_dataset_collection_association; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE workflow_invocation_step_output_dataset_collection_association (
+    id integer NOT NULL,
+    workflow_invocation_step_id integer,
+    workflow_step_id integer,
+    dataset_collection_id integer,
+    output_name character varying(255)
+);
+
+
+--
+-- Name: workflow_invocation_step_output_dataset_collection_assoc_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE workflow_invocation_step_output_dataset_collection_assoc_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: workflow_invocation_step_output_dataset_collection_assoc_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE workflow_invocation_step_output_dataset_collection_assoc_id_seq OWNED BY workflow_invocation_step_output_dataset_collection_association.id;
 
 
 --
@@ -5111,18 +5570,17 @@ ALTER SEQUENCE workflow_step_annotation_association_id_seq OWNED BY workflow_ste
 CREATE TABLE workflow_step_connection (
     id integer NOT NULL,
     output_step_id integer,
-    input_step_id integer,
+    input_step_input_id integer,
     output_name text,
-    input_name text,
     input_subworkflow_step_id integer
 );
 
 
 --
--- Name: workflow_step_connection_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: workflow_step_connection_id_seq1; Type: SEQUENCE; Schema: public; Owner: -
 --
 
-CREATE SEQUENCE workflow_step_connection_id_seq
+CREATE SEQUENCE workflow_step_connection_id_seq1
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -5131,10 +5589,10 @@ CREATE SEQUENCE workflow_step_connection_id_seq
 
 
 --
--- Name: workflow_step_connection_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: workflow_step_connection_id_seq1; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
-ALTER SEQUENCE workflow_step_connection_id_seq OWNED BY workflow_step_connection.id;
+ALTER SEQUENCE workflow_step_connection_id_seq1 OWNED BY workflow_step_connection.id;
 
 
 --
@@ -5154,6 +5612,43 @@ CREATE SEQUENCE workflow_step_id_seq
 --
 
 ALTER SEQUENCE workflow_step_id_seq OWNED BY workflow_step.id;
+
+
+--
+-- Name: workflow_step_input; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE workflow_step_input (
+    id integer NOT NULL,
+    workflow_step_id integer,
+    name text,
+    merge_type text,
+    scatter_type text,
+    value_from bytea,
+    value_from_type text,
+    default_value bytea,
+    default_value_set boolean,
+    runtime_value boolean
+);
+
+
+--
+-- Name: workflow_step_input_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE workflow_step_input_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: workflow_step_input_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE workflow_step_input_id_seq OWNED BY workflow_step_input.id;
 
 
 --
@@ -5299,6 +5794,20 @@ ALTER TABLE ONLY cleanup_event_library_folder_association ALTER COLUMN id SET DE
 --
 
 ALTER TABLE ONLY cleanup_event_metadata_file_association ALTER COLUMN id SET DEFAULT nextval('cleanup_event_metadata_file_association_id_seq'::regclass);
+
+
+--
+-- Name: cleanup_event_user_association id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY cleanup_event_user_association ALTER COLUMN id SET DEFAULT nextval('cleanup_event_user_association_id_seq'::regclass);
+
+
+--
+-- Name: cloudauthz id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY cloudauthz ALTER COLUMN id SET DEFAULT nextval('cloudauthz_id_seq'::regclass);
 
 
 --
@@ -5519,6 +6028,13 @@ ALTER TABLE ONLY history_dataset_association_display_at_authorization ALTER COLU
 
 
 --
+-- Name: history_dataset_association_history id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY history_dataset_association_history ALTER COLUMN id SET DEFAULT nextval('history_dataset_association_history_id_seq'::regclass);
+
+
+--
 -- Name: history_dataset_association_rating_association id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -5586,6 +6102,20 @@ ALTER TABLE ONLY history_tag_association ALTER COLUMN id SET DEFAULT nextval('hi
 --
 
 ALTER TABLE ONLY history_user_share_association ALTER COLUMN id SET DEFAULT nextval('history_user_share_association_id_seq'::regclass);
+
+
+--
+-- Name: implicit_collection_jobs id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY implicit_collection_jobs ALTER COLUMN id SET DEFAULT nextval('implicit_collection_jobs_id_seq'::regclass);
+
+
+--
+-- Name: implicit_collection_jobs_job_association id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY implicit_collection_jobs_job_association ALTER COLUMN id SET DEFAULT nextval('implicit_collection_jobs_job_association_id_seq'::regclass);
 
 
 --
@@ -5827,6 +6357,13 @@ ALTER TABLE ONLY metadata_file ALTER COLUMN id SET DEFAULT nextval('metadata_fil
 
 
 --
+-- Name: oidc_user_authnz_tokens id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY oidc_user_authnz_tokens ALTER COLUMN id SET DEFAULT nextval('oidc_user_authnz_tokens_id_seq'::regclass);
+
+
+--
 -- Name: page id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -5880,6 +6417,34 @@ ALTER TABLE ONLY post_job_action ALTER COLUMN id SET DEFAULT nextval('post_job_a
 --
 
 ALTER TABLE ONLY post_job_action_association ALTER COLUMN id SET DEFAULT nextval('post_job_action_association_id_seq'::regclass);
+
+
+--
+-- Name: psa_association id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY psa_association ALTER COLUMN id SET DEFAULT nextval('psa_association_id_seq'::regclass);
+
+
+--
+-- Name: psa_code id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY psa_code ALTER COLUMN id SET DEFAULT nextval('psa_code_id_seq'::regclass);
+
+
+--
+-- Name: psa_nonce id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY psa_nonce ALTER COLUMN id SET DEFAULT nextval('psa_nonce_id_seq'::regclass);
+
+
+--
+-- Name: psa_partial id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY psa_partial ALTER COLUMN id SET DEFAULT nextval('psa_partial_id_seq'::regclass);
 
 
 --
@@ -6212,10 +6777,38 @@ ALTER TABLE ONLY workflow_invocation ALTER COLUMN id SET DEFAULT nextval('workfl
 
 
 --
+-- Name: workflow_invocation_output_dataset_association id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY workflow_invocation_output_dataset_association ALTER COLUMN id SET DEFAULT nextval('workflow_invocation_output_dataset_association_id_seq'::regclass);
+
+
+--
+-- Name: workflow_invocation_output_dataset_collection_association id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY workflow_invocation_output_dataset_collection_association ALTER COLUMN id SET DEFAULT nextval('workflow_invocation_output_dataset_collection_associatio_id_seq'::regclass);
+
+
+--
 -- Name: workflow_invocation_step id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY workflow_invocation_step ALTER COLUMN id SET DEFAULT nextval('workflow_invocation_step_id_seq'::regclass);
+
+
+--
+-- Name: workflow_invocation_step_output_dataset_association id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY workflow_invocation_step_output_dataset_association ALTER COLUMN id SET DEFAULT nextval('workflow_invocation_step_output_dataset_association_id_seq'::regclass);
+
+
+--
+-- Name: workflow_invocation_step_output_dataset_collection_association id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY workflow_invocation_step_output_dataset_collection_association ALTER COLUMN id SET DEFAULT nextval('workflow_invocation_step_output_dataset_collection_assoc_id_seq'::regclass);
 
 
 --
@@ -6285,7 +6878,14 @@ ALTER TABLE ONLY workflow_step_annotation_association ALTER COLUMN id SET DEFAUL
 -- Name: workflow_step_connection id; Type: DEFAULT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY workflow_step_connection ALTER COLUMN id SET DEFAULT nextval('workflow_step_connection_id_seq'::regclass);
+ALTER TABLE ONLY workflow_step_connection ALTER COLUMN id SET DEFAULT nextval('workflow_step_connection_id_seq1'::regclass);
+
+
+--
+-- Name: workflow_step_input id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY workflow_step_input ALTER COLUMN id SET DEFAULT nextval('workflow_step_input_id_seq'::regclass);
 
 
 --
@@ -6468,6 +7068,36 @@ SELECT pg_catalog.setval('cleanup_event_metadata_file_association_id_seq', 1, fa
 
 
 --
+-- Data for Name: cleanup_event_user_association; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY cleanup_event_user_association (id, create_time, cleanup_event_id, user_id) FROM stdin;
+\.
+
+
+--
+-- Name: cleanup_event_user_association_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('cleanup_event_user_association_id_seq', 1, false);
+
+
+--
+-- Data for Name: cloudauthz; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY cloudauthz (id, user_id, provider, config, authn_id, tokens, last_update, last_activity, description) FROM stdin;
+\.
+
+
+--
+-- Name: cloudauthz_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('cloudauthz_id_seq', 1, false);
+
+
+--
 -- Data for Name: data_manager_history_association; Type: TABLE DATA; Schema: public; Owner: -
 --
 
@@ -6509,7 +7139,7 @@ COPY dataset (id, create_time, update_time, state, deleted, purged, purgable, ex
 -- Data for Name: dataset_collection; Type: TABLE DATA; Schema: public; Owner: -
 --
 
-COPY dataset_collection (id, collection_type, create_time, update_time, populated_state, populated_state_message) FROM stdin;
+COPY dataset_collection (id, collection_type, create_time, update_time, populated_state, populated_state_message, element_count) FROM stdin;
 \.
 
 
@@ -6884,7 +7514,7 @@ SELECT pg_catalog.setval('history_annotation_association_id_seq', 1, false);
 -- Data for Name: history_dataset_association; Type: TABLE DATA; Schema: public; Owner: -
 --
 
-COPY history_dataset_association (id, history_id, dataset_id, create_time, update_time, copied_from_history_dataset_association_id, hid, name, info, blurb, peek, extension, metadata, parent_id, designation, deleted, visible, copied_from_library_dataset_dataset_association_id, state, purged, tool_version, extended_metadata_id, hidden_beneath_collection_instance_id) FROM stdin;
+COPY history_dataset_association (id, history_id, dataset_id, create_time, update_time, copied_from_history_dataset_association_id, hid, name, info, blurb, peek, extension, metadata, parent_id, designation, deleted, visible, copied_from_library_dataset_dataset_association_id, state, purged, tool_version, extended_metadata_id, hidden_beneath_collection_instance_id, version) FROM stdin;
 \.
 
 
@@ -6916,6 +7546,21 @@ COPY history_dataset_association_display_at_authorization (id, create_time, upda
 --
 
 SELECT pg_catalog.setval('history_dataset_association_display_at_authorization_id_seq', 1, false);
+
+
+--
+-- Data for Name: history_dataset_association_history; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY history_dataset_association_history (id, history_dataset_association_id, update_time, version, name, extension, metadata, extended_metadata_id) FROM stdin;
+\.
+
+
+--
+-- Name: history_dataset_association_history_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('history_dataset_association_history_id_seq', 1, false);
 
 
 --
@@ -6989,7 +7634,7 @@ SELECT pg_catalog.setval('history_dataset_collection_annotation_association_id_s
 -- Data for Name: history_dataset_collection_association; Type: TABLE DATA; Schema: public; Owner: -
 --
 
-COPY history_dataset_collection_association (id, collection_id, history_id, hid, name, deleted, visible, copied_from_history_dataset_collection_association_id, implicit_output_name) FROM stdin;
+COPY history_dataset_collection_association (id, collection_id, history_id, hid, name, deleted, visible, copied_from_history_dataset_collection_association_id, implicit_output_name, implicit_collection_jobs_id, job_id) FROM stdin;
 \.
 
 
@@ -7083,6 +7728,36 @@ SELECT pg_catalog.setval('history_user_share_association_id_seq', 1, false);
 
 
 --
+-- Data for Name: implicit_collection_jobs; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY implicit_collection_jobs (id, populated_state) FROM stdin;
+\.
+
+
+--
+-- Name: implicit_collection_jobs_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('implicit_collection_jobs_id_seq', 1, false);
+
+
+--
+-- Data for Name: implicit_collection_jobs_job_association; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY implicit_collection_jobs_job_association (implicit_collection_jobs_id, id, job_id, order_index) FROM stdin;
+\.
+
+
+--
+-- Name: implicit_collection_jobs_job_association_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('implicit_collection_jobs_job_association_id_seq', 1, false);
+
+
+--
 -- Data for Name: implicitly_converted_dataset_association; Type: TABLE DATA; Schema: public; Owner: -
 --
 
@@ -7116,7 +7791,7 @@ SELECT pg_catalog.setval('implicitly_created_dataset_collection_inputs_id_seq', 
 -- Data for Name: job; Type: TABLE DATA; Schema: public; Owner: -
 --
 
-COPY job (id, create_time, update_time, history_id, tool_id, tool_version, state, info, command_line, param_filename, runner_name, stdout, stderr, traceback, session_id, job_runner_name, job_runner_external_id, library_folder_id, user_id, imported, object_store_id, params, handler, exit_code, destination_id, destination_params, dependencies) FROM stdin;
+COPY job (id, create_time, update_time, history_id, tool_id, tool_version, state, info, command_line, param_filename, runner_name, stdout, stderr, traceback, session_id, job_runner_name, job_runner_external_id, library_folder_id, user_id, imported, object_store_id, params, handler, exit_code, destination_id, destination_params, dependencies, copied_from_job_id) FROM stdin;
 \.
 
 
@@ -7251,7 +7926,7 @@ SELECT pg_catalog.setval('job_to_implicit_output_dataset_collection_id_seq', 1, 
 -- Data for Name: job_to_input_dataset; Type: TABLE DATA; Schema: public; Owner: -
 --
 
-COPY job_to_input_dataset (id, job_id, dataset_id, name) FROM stdin;
+COPY job_to_input_dataset (id, job_id, dataset_id, name, dataset_version) FROM stdin;
 \.
 
 
@@ -7606,8 +8281,23 @@ GalaxyTools	lib/tool_shed/galaxy_install/migrate	1
 --
 
 COPY migrate_version (repository_id, repository_path, version) FROM stdin;
-Galaxy	lib/galaxy/model/migrate	135
+Galaxy	lib/galaxy/model/migrate	146
 \.
+
+
+--
+-- Data for Name: oidc_user_authnz_tokens; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY oidc_user_authnz_tokens (id, user_id, uid, provider, extra_data, lifetime, assoc_type) FROM stdin;
+\.
+
+
+--
+-- Name: oidc_user_authnz_tokens_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('oidc_user_authnz_tokens_id_seq', 1, false);
 
 
 --
@@ -7736,6 +8426,66 @@ SELECT pg_catalog.setval('post_job_action_association_id_seq', 1, false);
 --
 
 SELECT pg_catalog.setval('post_job_action_id_seq', 1, false);
+
+
+--
+-- Data for Name: psa_association; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY psa_association (id, server_url, handle, secret, issued, lifetime, assoc_type) FROM stdin;
+\.
+
+
+--
+-- Name: psa_association_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('psa_association_id_seq', 1, false);
+
+
+--
+-- Data for Name: psa_code; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY psa_code (id, email, code) FROM stdin;
+\.
+
+
+--
+-- Name: psa_code_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('psa_code_id_seq', 1, false);
+
+
+--
+-- Data for Name: psa_nonce; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY psa_nonce (id, server_url, "timestamp", salt) FROM stdin;
+\.
+
+
+--
+-- Name: psa_nonce_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('psa_nonce_id_seq', 1, false);
+
+
+--
+-- Data for Name: psa_partial; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY psa_partial (id, token, data, next_step, backend) FROM stdin;
+\.
+
+
+--
+-- Name: psa_partial_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('psa_partial_id_seq', 1, false);
 
 
 --
@@ -7982,7 +8732,7 @@ SELECT pg_catalog.setval('sample_state_id_seq', 1, false);
 -- Data for Name: stored_workflow; Type: TABLE DATA; Schema: public; Owner: -
 --
 
-COPY stored_workflow (id, create_time, update_time, user_id, latest_workflow_id, name, deleted, importable, slug, published) FROM stdin;
+COPY stored_workflow (id, create_time, update_time, user_id, latest_workflow_id, name, deleted, importable, slug, published, from_path) FROM stdin;
 \.
 
 
@@ -8444,10 +9194,40 @@ SELECT pg_catalog.setval('workflow_invocation_id_seq', 1, false);
 
 
 --
+-- Data for Name: workflow_invocation_output_dataset_association; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY workflow_invocation_output_dataset_association (id, workflow_invocation_id, workflow_step_id, dataset_id, workflow_output_id) FROM stdin;
+\.
+
+
+--
+-- Name: workflow_invocation_output_dataset_association_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('workflow_invocation_output_dataset_association_id_seq', 1, false);
+
+
+--
+-- Name: workflow_invocation_output_dataset_collection_associatio_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('workflow_invocation_output_dataset_collection_associatio_id_seq', 1, false);
+
+
+--
+-- Data for Name: workflow_invocation_output_dataset_collection_association; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY workflow_invocation_output_dataset_collection_association (id, workflow_invocation_id, workflow_step_id, dataset_collection_id, workflow_output_id) FROM stdin;
+\.
+
+
+--
 -- Data for Name: workflow_invocation_step; Type: TABLE DATA; Schema: public; Owner: -
 --
 
-COPY workflow_invocation_step (id, create_time, update_time, workflow_invocation_id, workflow_step_id, job_id, action) FROM stdin;
+COPY workflow_invocation_step (id, create_time, update_time, workflow_invocation_id, workflow_step_id, job_id, action, implicit_collection_jobs_id, state) FROM stdin;
 \.
 
 
@@ -8456,6 +9236,36 @@ COPY workflow_invocation_step (id, create_time, update_time, workflow_invocation
 --
 
 SELECT pg_catalog.setval('workflow_invocation_step_id_seq', 1, false);
+
+
+--
+-- Data for Name: workflow_invocation_step_output_dataset_association; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY workflow_invocation_step_output_dataset_association (id, workflow_invocation_step_id, dataset_id, output_name) FROM stdin;
+\.
+
+
+--
+-- Name: workflow_invocation_step_output_dataset_association_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('workflow_invocation_step_output_dataset_association_id_seq', 1, false);
+
+
+--
+-- Name: workflow_invocation_step_output_dataset_collection_assoc_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('workflow_invocation_step_output_dataset_collection_assoc_id_seq', 1, false);
+
+
+--
+-- Data for Name: workflow_invocation_step_output_dataset_collection_association; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY workflow_invocation_step_output_dataset_collection_association (id, workflow_invocation_step_id, workflow_step_id, dataset_collection_id, output_name) FROM stdin;
+\.
 
 
 --
@@ -8590,15 +9400,15 @@ SELECT pg_catalog.setval('workflow_step_annotation_association_id_seq', 1, false
 -- Data for Name: workflow_step_connection; Type: TABLE DATA; Schema: public; Owner: -
 --
 
-COPY workflow_step_connection (id, output_step_id, input_step_id, output_name, input_name, input_subworkflow_step_id) FROM stdin;
+COPY workflow_step_connection (id, output_step_id, input_step_input_id, output_name, input_subworkflow_step_id) FROM stdin;
 \.
 
 
 --
--- Name: workflow_step_connection_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+-- Name: workflow_step_connection_id_seq1; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('workflow_step_connection_id_seq', 1, false);
+SELECT pg_catalog.setval('workflow_step_connection_id_seq1', 1, false);
 
 
 --
@@ -8606,6 +9416,21 @@ SELECT pg_catalog.setval('workflow_step_connection_id_seq', 1, false);
 --
 
 SELECT pg_catalog.setval('workflow_step_id_seq', 1, false);
+
+
+--
+-- Data for Name: workflow_step_input; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY workflow_step_input (id, workflow_step_id, name, merge_type, scatter_type, value_from, value_from_type, default_value, default_value_set, runtime_value) FROM stdin;
+\.
+
+
+--
+-- Name: workflow_step_input_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('workflow_step_input_id_seq', 1, false);
 
 
 --
@@ -8724,6 +9549,22 @@ ALTER TABLE ONLY cleanup_event_metadata_file_association
 
 ALTER TABLE ONLY cleanup_event
     ADD CONSTRAINT cleanup_event_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: cleanup_event_user_association cleanup_event_user_association_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY cleanup_event_user_association
+    ADD CONSTRAINT cleanup_event_user_association_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: cloudauthz cloudauthz_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY cloudauthz
+    ADD CONSTRAINT cloudauthz_pkey PRIMARY KEY (id);
 
 
 --
@@ -8951,6 +9792,14 @@ ALTER TABLE ONLY history_dataset_association_display_at_authorization
 
 
 --
+-- Name: history_dataset_association_history history_dataset_association_history_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY history_dataset_association_history
+    ADD CONSTRAINT history_dataset_association_history_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: history_dataset_association history_dataset_association_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -9044,6 +9893,22 @@ ALTER TABLE ONLY history_tag_association
 
 ALTER TABLE ONLY history_user_share_association
     ADD CONSTRAINT history_user_share_association_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: implicit_collection_jobs_job_association implicit_collection_jobs_job_association_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY implicit_collection_jobs_job_association
+    ADD CONSTRAINT implicit_collection_jobs_job_association_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: implicit_collection_jobs implicit_collection_jobs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY implicit_collection_jobs
+    ADD CONSTRAINT implicit_collection_jobs_pkey PRIMARY KEY (id);
 
 
 --
@@ -9327,6 +10192,14 @@ ALTER TABLE ONLY migrate_version
 
 
 --
+-- Name: oidc_user_authnz_tokens oidc_user_authnz_tokens_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY oidc_user_authnz_tokens
+    ADD CONSTRAINT oidc_user_authnz_tokens_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: page_annotation_association page_annotation_association_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -9396,6 +10269,38 @@ ALTER TABLE ONLY post_job_action_association
 
 ALTER TABLE ONLY post_job_action
     ADD CONSTRAINT post_job_action_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: psa_association psa_association_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY psa_association
+    ADD CONSTRAINT psa_association_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: psa_code psa_code_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY psa_code
+    ADD CONSTRAINT psa_code_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: psa_nonce psa_nonce_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY psa_nonce
+    ADD CONSTRAINT psa_nonce_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: psa_partial psa_partial_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY psa_partial
+    ADD CONSTRAINT psa_partial_pkey PRIMARY KEY (id);
 
 
 --
@@ -9775,11 +10680,43 @@ ALTER TABLE ONLY visualization_user_share_association
 
 
 --
+-- Name: workflow_invocation_output_dataset_association workflow_invocation_output_dataset_association_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY workflow_invocation_output_dataset_association
+    ADD CONSTRAINT workflow_invocation_output_dataset_association_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: workflow_invocation_output_dataset_collection_association workflow_invocation_output_dataset_collection_association_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY workflow_invocation_output_dataset_collection_association
+    ADD CONSTRAINT workflow_invocation_output_dataset_collection_association_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: workflow_invocation workflow_invocation_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY workflow_invocation
     ADD CONSTRAINT workflow_invocation_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: workflow_invocation_step_output_dataset_association workflow_invocation_step_output_dataset_association_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY workflow_invocation_step_output_dataset_association
+    ADD CONSTRAINT workflow_invocation_step_output_dataset_association_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: workflow_invocation_step_output_dataset_collection_association workflow_invocation_step_output_dataset_collection_associa_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY workflow_invocation_step_output_dataset_collection_association
+    ADD CONSTRAINT workflow_invocation_step_output_dataset_collection_associa_pkey PRIMARY KEY (id);
 
 
 --
@@ -9863,11 +10800,27 @@ ALTER TABLE ONLY workflow_step_annotation_association
 
 
 --
--- Name: workflow_step_connection workflow_step_connection_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_step_connection workflow_step_connection_pkey1; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY workflow_step_connection
-    ADD CONSTRAINT workflow_step_connection_pkey PRIMARY KEY (id);
+    ADD CONSTRAINT workflow_step_connection_pkey1 PRIMARY KEY (id);
+
+
+--
+-- Name: workflow_step_input workflow_step_input_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY workflow_step_input
+    ADD CONSTRAINT workflow_step_input_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: workflow_step_input workflow_step_input_workflow_step_id_name_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY workflow_step_input
+    ADD CONSTRAINT workflow_step_input_workflow_step_id_name_key UNIQUE (workflow_step_id, name);
 
 
 --
@@ -10039,6 +10992,34 @@ CREATE INDEX ix_cleanup_event_metadata_file_association_cleanup_event_id ON clea
 --
 
 CREATE INDEX ix_cleanup_event_metadata_file_association_metadata_file_id ON cleanup_event_metadata_file_association USING btree (metadata_file_id);
+
+
+--
+-- Name: ix_cleanup_event_user_association_cleanup_event_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_cleanup_event_user_association_cleanup_event_id ON cleanup_event_user_association USING btree (cleanup_event_id);
+
+
+--
+-- Name: ix_cleanup_event_user_association_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_cleanup_event_user_association_user_id ON cleanup_event_user_association USING btree (user_id);
+
+
+--
+-- Name: ix_cloudauthz_authn_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_cloudauthz_authn_id ON cloudauthz USING btree (authn_id);
+
+
+--
+-- Name: ix_cloudauthz_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_cloudauthz_user_id ON cloudauthz USING btree (user_id);
 
 
 --
@@ -10602,10 +11583,31 @@ CREATE INDEX ix_history_dataset_association_display_at_authorization_user_id ON 
 
 
 --
+-- Name: ix_history_dataset_association_history_extended_metadata_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_history_dataset_association_history_extended_metadata_id ON history_dataset_association_history USING btree (extended_metadata_id);
+
+
+--
+-- Name: ix_history_dataset_association_history_history_dataset__5f1c; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_history_dataset_association_history_history_dataset__5f1c ON history_dataset_association_history USING btree (history_dataset_association_id);
+
+
+--
 -- Name: ix_history_dataset_association_history_id; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX ix_history_dataset_association_history_id ON history_dataset_association USING btree (history_id);
+
+
+--
+-- Name: ix_history_dataset_association_history_version; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_history_dataset_association_history_version ON history_dataset_association_history USING btree (version);
 
 
 --
@@ -10928,6 +11930,20 @@ CREATE INDEX ix_icda_ldda_id ON implicitly_converted_dataset_association USING b
 --
 
 CREATE INDEX ix_icda_ldda_parent_id ON implicitly_converted_dataset_association USING btree (ldda_parent_id);
+
+
+--
+-- Name: ix_implicit_collection_jobs_job_association_implicit_co_ea04; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_implicit_collection_jobs_job_association_implicit_co_ea04 ON implicit_collection_jobs_job_association USING btree (implicit_collection_jobs_id);
+
+
+--
+-- Name: ix_implicit_collection_jobs_job_association_job_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_implicit_collection_jobs_job_association_job_id ON implicit_collection_jobs_job_association USING btree (job_id);
 
 
 --
@@ -11740,6 +12756,13 @@ CREATE INDEX ix_metadata_file_purged ON metadata_file USING btree (purged);
 --
 
 CREATE INDEX ix_metadata_file_update_time ON metadata_file USING btree (update_time);
+
+
+--
+-- Name: ix_oidc_user_authnz_tokens_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_oidc_user_authnz_tokens_user_id ON oidc_user_authnz_tokens USING btree (user_id);
 
 
 --
@@ -12849,10 +13872,66 @@ CREATE INDEX ix_wfreq_inputstep_wfi ON workflow_request_input_step_parameter USI
 
 
 --
+-- Name: ix_workflow_invocation_output_dataset_association_dataset_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_workflow_invocation_output_dataset_association_dataset_id ON workflow_invocation_output_dataset_association USING btree (dataset_id);
+
+
+--
+-- Name: ix_workflow_invocation_output_dataset_association_workf_5924; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_workflow_invocation_output_dataset_association_workf_5924 ON workflow_invocation_output_dataset_association USING btree (workflow_invocation_id);
+
+
+--
+-- Name: ix_workflow_invocation_output_dataset_collection_associ_ab6c; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_workflow_invocation_output_dataset_collection_associ_ab6c ON workflow_invocation_output_dataset_collection_association USING btree (workflow_invocation_id);
+
+
+--
+-- Name: ix_workflow_invocation_output_dataset_collection_associ_ec97; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_workflow_invocation_output_dataset_collection_associ_ec97 ON workflow_invocation_output_dataset_collection_association USING btree (dataset_collection_id);
+
+
+--
 -- Name: ix_workflow_invocation_step_job_id; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX ix_workflow_invocation_step_job_id ON workflow_invocation_step USING btree (job_id);
+
+
+--
+-- Name: ix_workflow_invocation_step_output_dataset_association__66f5; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_workflow_invocation_step_output_dataset_association__66f5 ON workflow_invocation_step_output_dataset_association USING btree (dataset_id);
+
+
+--
+-- Name: ix_workflow_invocation_step_output_dataset_association__bcc0; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_workflow_invocation_step_output_dataset_association__bcc0 ON workflow_invocation_step_output_dataset_association USING btree (workflow_invocation_step_id);
+
+
+--
+-- Name: ix_workflow_invocation_step_output_dataset_collection_a_b73b; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_workflow_invocation_step_output_dataset_collection_a_b73b ON workflow_invocation_step_output_dataset_collection_association USING btree (dataset_collection_id);
+
+
+--
+-- Name: ix_workflow_invocation_step_output_dataset_collection_a_db49; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_workflow_invocation_step_output_dataset_collection_a_db49 ON workflow_invocation_step_output_dataset_collection_association USING btree (workflow_invocation_step_id);
 
 
 --
@@ -12933,10 +14012,17 @@ CREATE INDEX ix_workflow_step_annotation_association_workflow_step_id ON workflo
 
 
 --
--- Name: ix_workflow_step_connection_input_step_id; Type: INDEX; Schema: public; Owner: -
+-- Name: ix_workflow_step_connection_input_step_input_id; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX ix_workflow_step_connection_input_step_id ON workflow_step_connection USING btree (input_step_id);
+CREATE INDEX ix_workflow_step_connection_input_step_input_id ON workflow_step_connection USING btree (input_step_input_id);
+
+
+--
+-- Name: ix_workflow_step_connection_input_subworkflow_step_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_workflow_step_connection_input_subworkflow_step_id ON workflow_step_connection USING btree (input_subworkflow_step_id);
 
 
 --
@@ -12944,6 +14030,13 @@ CREATE INDEX ix_workflow_step_connection_input_step_id ON workflow_step_connecti
 --
 
 CREATE INDEX ix_workflow_step_connection_output_step_id ON workflow_step_connection USING btree (output_step_id);
+
+
+--
+-- Name: ix_workflow_step_input_workflow_step_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_workflow_step_input_workflow_step_id ON workflow_step_input USING btree (workflow_step_id);
 
 
 --
@@ -13194,6 +14287,38 @@ ALTER TABLE ONLY cleanup_event_metadata_file_association
 
 ALTER TABLE ONLY cleanup_event_metadata_file_association
     ADD CONSTRAINT cleanup_event_metadata_file_association_metadata_file_id_fkey FOREIGN KEY (metadata_file_id) REFERENCES metadata_file(id);
+
+
+--
+-- Name: cleanup_event_user_association cleanup_event_user_association_cleanup_event_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY cleanup_event_user_association
+    ADD CONSTRAINT cleanup_event_user_association_cleanup_event_id_fkey FOREIGN KEY (cleanup_event_id) REFERENCES cleanup_event(id);
+
+
+--
+-- Name: cleanup_event_user_association cleanup_event_user_association_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY cleanup_event_user_association
+    ADD CONSTRAINT cleanup_event_user_association_user_id_fkey FOREIGN KEY (user_id) REFERENCES galaxy_user(id);
+
+
+--
+-- Name: cloudauthz cloudauthz_authn_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY cloudauthz
+    ADD CONSTRAINT cloudauthz_authn_id_fkey FOREIGN KEY (authn_id) REFERENCES oidc_user_authnz_tokens(id);
+
+
+--
+-- Name: cloudauthz cloudauthz_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY cloudauthz
+    ADD CONSTRAINT cloudauthz_user_id_fkey FOREIGN KEY (user_id) REFERENCES galaxy_user(id);
 
 
 --
@@ -13637,11 +14762,27 @@ ALTER TABLE ONLY history_dataset_association
 
 
 --
+-- Name: history_dataset_association_history history_dataset_association_h_history_dataset_association__fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY history_dataset_association_history
+    ADD CONSTRAINT history_dataset_association_h_history_dataset_association__fkey FOREIGN KEY (history_dataset_association_id) REFERENCES history_dataset_association(id);
+
+
+--
 -- Name: history_dataset_association history_dataset_association_hidden_beneath_collection_inst_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY history_dataset_association
     ADD CONSTRAINT history_dataset_association_hidden_beneath_collection_inst_fkey FOREIGN KEY (hidden_beneath_collection_instance_id) REFERENCES history_dataset_collection_association(id);
+
+
+--
+-- Name: history_dataset_association_history history_dataset_association_history_extended_metadata_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY history_dataset_association_history
+    ADD CONSTRAINT history_dataset_association_history_extended_metadata_id_fkey FOREIGN KEY (extended_metadata_id) REFERENCES extended_metadata(id);
 
 
 --
@@ -13733,6 +14874,14 @@ ALTER TABLE ONLY history_dataset_collection_association
 
 
 --
+-- Name: history_dataset_collection_association history_dataset_collection_ass_implicit_collection_jobs_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY history_dataset_collection_association
+    ADD CONSTRAINT history_dataset_collection_ass_implicit_collection_jobs_id_fkey FOREIGN KEY (implicit_collection_jobs_id) REFERENCES implicit_collection_jobs(id);
+
+
+--
 -- Name: history_dataset_collection_association history_dataset_collection_association_collection_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -13746,6 +14895,14 @@ ALTER TABLE ONLY history_dataset_collection_association
 
 ALTER TABLE ONLY history_dataset_collection_association
     ADD CONSTRAINT history_dataset_collection_association_history_id_fkey FOREIGN KEY (history_id) REFERENCES history(id);
+
+
+--
+-- Name: history_dataset_collection_association history_dataset_collection_association_job_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY history_dataset_collection_association
+    ADD CONSTRAINT history_dataset_collection_association_job_id_fkey FOREIGN KEY (job_id) REFERENCES job(id);
 
 
 --
@@ -13850,6 +15007,22 @@ ALTER TABLE ONLY history_user_share_association
 
 ALTER TABLE ONLY history_user_share_association
     ADD CONSTRAINT history_user_share_association_user_id_fkey FOREIGN KEY (user_id) REFERENCES galaxy_user(id);
+
+
+--
+-- Name: implicit_collection_jobs_job_association implicit_collection_jobs_job_a_implicit_collection_jobs_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY implicit_collection_jobs_job_association
+    ADD CONSTRAINT implicit_collection_jobs_job_a_implicit_collection_jobs_id_fkey FOREIGN KEY (implicit_collection_jobs_id) REFERENCES implicit_collection_jobs(id);
+
+
+--
+-- Name: implicit_collection_jobs_job_association implicit_collection_jobs_job_association_job_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY implicit_collection_jobs_job_association
+    ADD CONSTRAINT implicit_collection_jobs_job_association_job_id_fkey FOREIGN KEY (job_id) REFERENCES job(id);
 
 
 --
@@ -14466,6 +15639,14 @@ ALTER TABLE ONLY metadata_file
 
 ALTER TABLE ONLY metadata_file
     ADD CONSTRAINT metadata_file_lda_id_fkey FOREIGN KEY (lda_id) REFERENCES library_dataset_dataset_association(id);
+
+
+--
+-- Name: oidc_user_authnz_tokens oidc_user_authnz_tokens_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY oidc_user_authnz_tokens
+    ADD CONSTRAINT oidc_user_authnz_tokens_user_id_fkey FOREIGN KEY (user_id) REFERENCES galaxy_user(id);
 
 
 --
@@ -15213,11 +16394,123 @@ ALTER TABLE ONLY workflow_invocation
 
 
 --
+-- Name: workflow_invocation_output_dataset_association workflow_invocation_output_dataset__workflow_invocation_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY workflow_invocation_output_dataset_association
+    ADD CONSTRAINT workflow_invocation_output_dataset__workflow_invocation_id_fkey FOREIGN KEY (workflow_invocation_id) REFERENCES workflow_invocation(id);
+
+
+--
+-- Name: workflow_invocation_output_dataset_association workflow_invocation_output_dataset_asso_workflow_output_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY workflow_invocation_output_dataset_association
+    ADD CONSTRAINT workflow_invocation_output_dataset_asso_workflow_output_id_fkey FOREIGN KEY (workflow_output_id) REFERENCES workflow_output(id);
+
+
+--
+-- Name: workflow_invocation_output_dataset_association workflow_invocation_output_dataset_associ_workflow_step_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY workflow_invocation_output_dataset_association
+    ADD CONSTRAINT workflow_invocation_output_dataset_associ_workflow_step_id_fkey FOREIGN KEY (workflow_step_id) REFERENCES workflow_step(id);
+
+
+--
+-- Name: workflow_invocation_output_dataset_association workflow_invocation_output_dataset_association_dataset_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY workflow_invocation_output_dataset_association
+    ADD CONSTRAINT workflow_invocation_output_dataset_association_dataset_id_fkey FOREIGN KEY (dataset_id) REFERENCES history_dataset_association(id);
+
+
+--
+-- Name: workflow_invocation_output_dataset_collection_association workflow_invocation_output_dataset_c_dataset_collection_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY workflow_invocation_output_dataset_collection_association
+    ADD CONSTRAINT workflow_invocation_output_dataset_c_dataset_collection_id_fkey FOREIGN KEY (dataset_collection_id) REFERENCES history_dataset_collection_association(id);
+
+
+--
+-- Name: workflow_invocation_output_dataset_collection_association workflow_invocation_output_dataset_coll_workflow_output_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY workflow_invocation_output_dataset_collection_association
+    ADD CONSTRAINT workflow_invocation_output_dataset_coll_workflow_output_id_fkey FOREIGN KEY (workflow_output_id) REFERENCES workflow_output(id);
+
+
+--
+-- Name: workflow_invocation_output_dataset_collection_association workflow_invocation_output_dataset_collec_workflow_step_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY workflow_invocation_output_dataset_collection_association
+    ADD CONSTRAINT workflow_invocation_output_dataset_collec_workflow_step_id_fkey FOREIGN KEY (workflow_step_id) REFERENCES workflow_step(id);
+
+
+--
+-- Name: workflow_invocation_output_dataset_collection_association workflow_invocation_output_dataset_workflow_invocation_id_fkey1; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY workflow_invocation_output_dataset_collection_association
+    ADD CONSTRAINT workflow_invocation_output_dataset_workflow_invocation_id_fkey1 FOREIGN KEY (workflow_invocation_id) REFERENCES workflow_invocation(id);
+
+
+--
+-- Name: workflow_invocation_step workflow_invocation_step_implicit_collection_jobs_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY workflow_invocation_step
+    ADD CONSTRAINT workflow_invocation_step_implicit_collection_jobs_id_fkey FOREIGN KEY (implicit_collection_jobs_id) REFERENCES implicit_collection_jobs(id);
+
+
+--
 -- Name: workflow_invocation_step workflow_invocation_step_job_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY workflow_invocation_step
     ADD CONSTRAINT workflow_invocation_step_job_id_fkey FOREIGN KEY (job_id) REFERENCES job(id);
+
+
+--
+-- Name: workflow_invocation_step_output_dataset_collection_association workflow_invocation_step_outp_workflow_invocation_step_id_fkey1; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY workflow_invocation_step_output_dataset_collection_association
+    ADD CONSTRAINT workflow_invocation_step_outp_workflow_invocation_step_id_fkey1 FOREIGN KEY (workflow_invocation_step_id) REFERENCES workflow_invocation_step(id);
+
+
+--
+-- Name: workflow_invocation_step_output_dataset_association workflow_invocation_step_outpu_workflow_invocation_step_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY workflow_invocation_step_output_dataset_association
+    ADD CONSTRAINT workflow_invocation_step_outpu_workflow_invocation_step_id_fkey FOREIGN KEY (workflow_invocation_step_id) REFERENCES workflow_invocation_step(id);
+
+
+--
+-- Name: workflow_invocation_step_output_dataset_collection_association workflow_invocation_step_output_data_dataset_collection_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY workflow_invocation_step_output_dataset_collection_association
+    ADD CONSTRAINT workflow_invocation_step_output_data_dataset_collection_id_fkey FOREIGN KEY (dataset_collection_id) REFERENCES history_dataset_collection_association(id);
+
+
+--
+-- Name: workflow_invocation_step_output_dataset_association workflow_invocation_step_output_dataset_associa_dataset_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY workflow_invocation_step_output_dataset_association
+    ADD CONSTRAINT workflow_invocation_step_output_dataset_associa_dataset_id_fkey FOREIGN KEY (dataset_id) REFERENCES history_dataset_association(id);
+
+
+--
+-- Name: workflow_invocation_step_output_dataset_collection_association workflow_invocation_step_output_dataset_c_workflow_step_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY workflow_invocation_step_output_dataset_collection_association
+    ADD CONSTRAINT workflow_invocation_step_output_dataset_c_workflow_step_id_fkey FOREIGN KEY (workflow_step_id) REFERENCES workflow_step(id);
 
 
 --
@@ -15349,27 +16642,35 @@ ALTER TABLE ONLY workflow_step_annotation_association
 
 
 --
--- Name: workflow_step_connection workflow_step_connection_input_step_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_step_connection workflow_step_connection_input_step_input_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY workflow_step_connection
-    ADD CONSTRAINT workflow_step_connection_input_step_id_fkey FOREIGN KEY (input_step_id) REFERENCES workflow_step(id);
+    ADD CONSTRAINT workflow_step_connection_input_step_input_id_fkey FOREIGN KEY (input_step_input_id) REFERENCES workflow_step_input(id);
 
 
 --
--- Name: workflow_step_connection workflow_step_connection_input_subworkflow_step_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY workflow_step_connection
-    ADD CONSTRAINT workflow_step_connection_input_subworkflow_step_id_fkey FOREIGN KEY (input_subworkflow_step_id) REFERENCES workflow_step(id);
-
-
---
--- Name: workflow_step_connection workflow_step_connection_output_step_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_step_connection workflow_step_connection_input_subworkflow_step_id_fkey1; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY workflow_step_connection
-    ADD CONSTRAINT workflow_step_connection_output_step_id_fkey FOREIGN KEY (output_step_id) REFERENCES workflow_step(id);
+    ADD CONSTRAINT workflow_step_connection_input_subworkflow_step_id_fkey1 FOREIGN KEY (input_subworkflow_step_id) REFERENCES workflow_step(id);
+
+
+--
+-- Name: workflow_step_connection workflow_step_connection_output_step_id_fkey1; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY workflow_step_connection
+    ADD CONSTRAINT workflow_step_connection_output_step_id_fkey1 FOREIGN KEY (output_step_id) REFERENCES workflow_step(id);
+
+
+--
+-- Name: workflow_step_input workflow_step_input_workflow_step_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY workflow_step_input
+    ADD CONSTRAINT workflow_step_input_workflow_step_id_fkey FOREIGN KEY (workflow_step_id) REFERENCES workflow_step(id);
 
 
 --

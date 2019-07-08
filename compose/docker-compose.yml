@@ -3,7 +3,8 @@ services:
   # proftpd container
   galaxy-proftpd:
     # build: galaxy-proftpd
-    image: quay.io/galaxy/proftpd:${TAG:-latest}
+    image: quay.io/bgruening/galaxy-proftpd:${TAG_PROFTPD:-latest}
+    env_file: .env
     environment:
         - proftpd_db_connection=galaxy@galaxy-postgres
         - proftpd_db_username=galaxy
@@ -33,17 +34,19 @@ services:
       mode: replicated
       replicas: 1
       placement:
-        constraints: [node.role == manager]
-    labels: 
+        constraints:
+            - node.role == ${NODE_ROLE:-manager}
+    labels:
         kompose.service.type: nodeport
 
   galaxy-postgres:
     # If you are using the official postgres image, it needs to be populated by calling
     # docker-compose run galaxy install_db.sh
     # on first run
-    image: quay.io/galaxy/postgres:${TAG:-latest}
+    image: quay.io/bgruening/galaxy-postgres:${TAG_POSTGRES:-latest}
     container_name: galaxy-postgres
     hostname: galaxy-postgres
+    env_file: .env
     environment:
         - POSTGRES_PASSWORD=chaopagoosaequuashie
         - POSTGRES_USER=galaxy
@@ -58,13 +61,15 @@ services:
       mode: replicated
       replicas: 1
       placement:
-        constraints: [node.role == manager]
+        constraints:
+          - node.role == ${NODE_ROLE:-manager}
 
 
   # PostgreSQL admin suite
   pgadmin4:
     image: thajeztah/pgadmin4
     container_name: pgadmin4
+    env_file: .env
     ports:
         - "5050:5050"
     links:
@@ -75,17 +80,21 @@ services:
     restart: unless-stopped
     networks:
       - galaxy
+    depends_on:
+      - galaxy-postgres
     deploy:
       placement:
-        constraints: [node.role == manager]
-    labels: 
+        constraints:
+          - node.role == ${NODE_ROLE:-manager}
+    labels:
         kompose.service.type: nodeport
 
   # SLURM container - this is your compute cluster :)
   galaxy-slurm:
     # build: galaxy-slurm
-    image: quay.io/galaxy/slurm:${TAG:-latest}
+    image: quay.io/bgruening/galaxy-slurm:${TAG:-latest}
     privileged: True
+    env_file: .env
     #${PRIVILEGED_SLURM_CONTAINER:-False}
     environment: {}
     container_name: galaxy-slurm
@@ -99,7 +108,8 @@ services:
       mode: replicated
       replicas: 1
       placement:
-        constraints: [node.role == worker]
+        constraints:
+          - node.role == ${NODE_ROLE:-worker}
 
 
   # This container initializes the galaxy export.
@@ -108,6 +118,7 @@ services:
     image: quay.io/bgruening/galaxy-init:${TAG:-latest}
     container_name: galaxy-init
     hostname: galaxy-init
+    env_file: .env
     volumes:
         # This is the directory where all your files from Galaxy will be stored
         # on your host system. By default this is 'export' in your current working dir
@@ -116,13 +127,17 @@ services:
       - galaxy
     deploy:
       placement:
-        constraints: [node.role == manager]
+        constraints:
+          - node.role == ${NODE_ROLE:-manager}
 
 
   galaxy-htcondor:
     image: quay.io/bgruening/galaxy-htcondor:${TAG:-latest}
     container_name: galaxy-htcondor
     hostname: galaxy-htcondor
+    env_file: .env
+    #fix the multiple IP addresses issue cause by swarm
+    command: bash -c 'echo "NETWORK_INTERFACE = $$(hostname -i | cut --delimiter " " --fields 2)" >> /etc/condor/config.d/fix-network && /usr/bin/supervisord'
     volumes:
         - ${EXPORT_DIR:-/export}/:/export
     restart: unless-stopped
@@ -132,7 +147,8 @@ services:
       mode: replicated
       replicas: 1
       placement:
-        constraints: [node.role == worker]
+        constraints:
+          - node.role == ${NODE_ROLE:-worker}
 
 
   galaxy-htcondor-executor:
@@ -141,8 +157,11 @@ services:
     # a RW cgroups mount. A RO cgroups mount throws an error in ProcD for running jobs.
     privileged: True
     #${PRIVILEGED_CONDOR_CONTAINER:-False}
+    env_file: .env
     environment:
         - CONDOR_HOST=galaxy-htcondor
+    #fix the multiple IP addresses issue cause by swarm
+    command: bash -c 'echo "NETWORK_INTERFACE = $$(hostname -i | cut --delimiter " " --fields 2)" >> /etc/condor/config.d/fix-network && /usr/bin/startup.sh'
     volumes:
         - ${EXPORT_DIR:-/export}/:/export
         - /var/run/docker.sock:/var/run/docker.sock
@@ -153,19 +172,23 @@ services:
       mode: replicated
       replicas: 1
       placement:
-        constraints: [node.role == worker]
+        constraints:
+          - node.role == ${NODE_ROLE:-worker}
 
 
   galaxy-htcondor-executor-big:
-    image: quay.io/bgruening/galaxy-htcondor-executor
+    image: quay.io/bgruening/galaxy-htcondor-executor:${TAG:-latest}
     # privileged is needed to run Docker jobs, moreover HTCondor wants
     # a RW cgroups mount. A RO cgroups mount throws an error in ProcD for running jobs.
     privileged: True
     #${PRIVILEGED_CONDOR_CONTAINER:-False}
+    env_file: .env
     environment:
         - CONDOR_HOST=galaxy-htcondor
         - CONDOR_CPUS=2
         - CONDOR_MEMORY=2048
+    #fix the multiple IP addresses issue cause by swarm
+    command: bash -c 'echo "NETWORK_INTERFACE = $$(hostname -i | cut --delimiter " " --fields 2)" >> /etc/condor/config.d/fix-network && /usr/bin/startup.sh'
     volumes:
         - ${EXPORT_DIR:-/export}/:/export
         - /var/run/docker.sock:/var/run/docker.sock
@@ -176,7 +199,8 @@ services:
       mode: replicated
       replicas: 1
       placement:
-        constraints: [node.role == worker]
+        constraints:
+          - node.role == ${NODE_ROLE:-worker}
 
 
   # Message queue for better performance
@@ -184,6 +208,7 @@ services:
     image: rabbitmq:alpine
     container_name: galaxy-rabbitmq
     hostname: rabbitmq
+    env_file: .env
     environment:
         - RABBITMQ_DEFAULT_USER=galaxy
         - RABBITMQ_DEFAULT_PASS=vaiJa3ieghai2ief0jao
@@ -196,17 +221,55 @@ services:
       mode: replicated
       replicas: 1
       placement:
-        constraints: [node.role == worker]
+        constraints:
+          - node.role == ${NODE_ROLE:-worker}
 
+
+  # Grafana and InfluxDB for statistics
+  influxdb:
+    image: influxdb:1.4-alpine
+    env_file: .env
+    environment:
+        - RABBITMQ_DEFAULT_USER=galaxy
+        - RABBITMQ_DEFAULT_PASS=vaiJa3ieghai2ief0jao
+        - RABBITMQ_DEFAULT_VHOST=galaxy
+    volumes:
+        - ${EXPORT_DIR:-/export}/influxdb:/var/lib/influxdb
+    networks:
+      - galaxy
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == ${NODE_ROLE:-worker}
+
+  grafana:
+    image: quay.io/bgruening/galaxy-grafana:${TAG:-latest}
+    env_file: .env
+    volumes:
+        - ${EXPORT_DIR:-/export}/grafana:/var/lib/grafana
+    networks:
+      - galaxy
+    ports:
+        - "3000:3000"
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+            - node.role == ${NODE_ROLE:-worker}
 
   # This container provides the galaxy uwsgi webhandlers, job handlers, nginx
   galaxy-web:
     # build: galaxy-web
     image: quay.io/bgruening/galaxy-web:${TAG:-latest}
+    env_file: .env
     environment:
         # In case the galaxy-init container is not used, you need to include "sleeplock" to NONUSE
         - NONUSE=proftpd,postgres,slurmd,slurmctld
-        - GALAXY_DEFAULT_ADMIN_USER=admin@galaxy.org
+        - GALAXY_DEFAULT_ADMIN_USER=admin
+        - GALAXY_DEFAULT_ADMIN_EMAIL=admin@galaxy.org
         - GALAXY_DEFAULT_ADMIN_PASSWORD=admin
         - GALAXY_DEFAULT_ADMIN_KEY=admin
         - GALAXY_HANDLER_NUMPROCS=2
@@ -217,11 +280,11 @@ services:
         - GALAXY_CONFIG_ENABLE_BETA_WORKFLOW_MODULES=True
         - GALAXY_CONFIG_DATABASE_CONNECTION=postgresql://galaxy:chaopagoosaequuashie@galaxy-postgres/galaxy?client_encoding=utf8
         - GALAXY_CONFIG_TOOL_DATA_TABLE_CONFIG_PATH=/etc/galaxy/tool_data_table_conf.xml
-        # Configurate admin and master api key. Can be overridden in galaxy.ini
+        # Configurate admin and master api key. Can be overridden in galaxy.yml
         - GALAXY_CONFIG_ADMIN_USERS=admin@galaxy.org
         - GALAXY_CONFIG_MASTER_API_KEY=HSNiugRFvgT574F43jZ7N9F3
         - GALAXY_CONFIG_DATABASE_AUTO_MIGRATE=${GALAXY_CONFIG_DATABASE_AUTO_MIGRATE:-false}
-        - GALAXY_CONFIG_AMQP_INTERNAL_CONNECTION=amqp://galaxy:vaiJa3ieghai2ief0jao@rabbitmq/galaxy 
+        - GALAXY_CONFIG_AMQP_INTERNAL_CONNECTION=amqp://galaxy:vaiJa3ieghai2ief0jao@rabbitmq/galaxy
         # Condor
         - GALAXY_DESTINATIONS_DEFAULT=${GALAXY_DESTINATIONS_DEFAULT:-slurm_cluster}
         - GALAXY_RUNNERS_ENABLE_CONDOR=${GALAXY_RUNNERS_ENABLE_CONDOR:-False}
@@ -252,6 +315,8 @@ services:
     container_name: galaxy-web
     hostname: galaxy
     privileged: True
+    #Fix the multiple ID addresses issue cause by swarm
+    command: bash -c 'echo "NETWORK_INTERFACE = $$(hostname -i | cut --delimiter " " --fields 2)" >> /etc/condor/config.d/fix-network && /usr/bin/startup'
     networks:
       - galaxy
     ports:
@@ -267,11 +332,10 @@ services:
       - rabbitmq
     deploy:
       placement:
-        constraints: [node.role == manager]
-    labels: 
+        constraints:
+            - node.role == ${NODE_ROLE:-manager}
+    labels:
         kompose.service.type: nodeport
 
 networks:
     galaxy:
-
-
