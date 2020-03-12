@@ -4,7 +4,7 @@
 
 FROM ubuntu:18.04
 
-MAINTAINER Björn A. Grüning, bjoern.gruening@gmail.com
+LABEL maintainer="Miguel Caballer, micafer1@upv.es"
 
 # TODO
 #
@@ -84,18 +84,14 @@ RUN groupadd -r postgres -g $GALAXY_POSTGRES_GID \
     && apt-get -qq update && apt-get install --no-install-recommends -y software-properties-common gpg-agent curl sudo \
     && curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add - \
     && add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
-    && sudo add-apt-repository ppa:natefoo/slurm-drmaa \
     && apt-get update -qq \
     ## && apt-get purge -y software-properties-common gpg-agent \
     ## && apt-get install postgresql-10 --no-install-recommends -y \
     && apt-get install nginx-extras nginx-common --no-install-recommends -y \
     && apt-get install docker-ce-cli --no-install-recommends -y \
-    && apt-get install slurm-client slurmd slurmctld slurm-drmaa1 --no-install-recommends -y \
-    && ln -s /usr/lib/slurm-drmaa/lib/libdrmaa.so.1 /usr/lib/slurm-drmaa/lib/libdrmaa.so \
     && apt-get install proftpd proftpd-mod-pgsql --no-install-recommends -y \
     && apt-get install munge libmunge-dev --no-install-recommends -y \
     && apt-get install nano --no-install-recommends -y \
-    && apt-get install htcondor --no-install-recommends -y \
     && apt-get install git --no-install-recommends -y \
     && apt-get install gridengine-common gridengine-drmaa1.0 --no-install-recommends -y \
     && apt-get install rabbitmq-server --no-install-recommends -y \
@@ -111,6 +107,25 @@ RUN groupadd -r postgres -g $GALAXY_POSTGRES_GID \
     # cleanup dance
     && find /usr/lib/ -name '*.pyc' -delete \
     && rm -rf /tmp/* /root/.cache/ /var/cache/* $GALAXY_ROOT/client/node_modules/ $GALAXY_VIRTUAL_ENV/src/ /home/galaxy/.cache/ /home/galaxy/.npm/
+
+# installing more recend SLURM
+RUN apt update -qq && apt install --no-install-recommends -y wget gcc make libc6-dev && \
+    wget -q http://ftpgrycap.i3m.upv.es/src/slurm-16.05.11.tar.bz2 && \
+    tar xf slurm-16.05.11.tar.bz2 && \
+    cd slurm-16.05.11 && \
+    ./configure --prefix=/usr --sysconfdir=/etc/slurm-llnl --with-munge=/usr && \
+    make && \
+    make install && \
+    cd .. && \
+    wget -q http://apps.man.poznan.pl/trac/slurm-drmaa/downloads/9 && \
+    tar xf 9 && \
+    cd slurm-drmaa-1.0.7 && \
+    ./configure --with-slurm-inc=/usr/include --with-slurm-lib=/usr/lib --sysconfdir=/etc && \
+    make && \
+    make install && \
+    rm -rf /9 /slurm* && \
+    apt-get purge -y gcc make libc6-dev && \
+    apt-get autoremove -y && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /var/cache/* ~/.cache/
 
 ADD ./bashrc $GALAXY_HOME/.bashrc
 
@@ -198,8 +213,8 @@ RUN mkdir -p /shed_tools $EXPORT_DIR/ftp/ \
         --extra-vars galaxy_job_conf_path=$GALAXY_CONFIG_JOB_CONFIG_FILE \
         --extra-vars galaxy_job_metrics_conf_path=$GALAXY_CONFIG_JOB_METRICS_CONFIG_FILE \
         --extra-vars supervisor_manage_slurm="" \
-        --extra-vars galaxy_extras_config_condor=True \
-        --extra-vars galaxy_extras_config_condor_docker=True \
+        --extra-vars galaxy_extras_config_condor=False \
+        --extra-vars galaxy_extras_config_condor_docker=False \
         --extra-vars galaxy_extras_config_rabbitmq=True \
         --extra-vars galaxy_extras_config_cvmfs=True \
         --extra-vars proftpd_db_connection=galaxy@galaxy \
@@ -229,10 +244,6 @@ RUN mkdir -p /shed_tools $EXPORT_DIR/ftp/ \
     && find $GALAXY_CONDA_PREFIX/ -name '*.pyc' -delete | true \
     && find $GALAXY_VIRTUAL_ENV -name '*.pyc' -delete | true \
     && rm -rf /tmp/* /root/.cache/ /var/cache/* $GALAXY_ROOT/client/node_modules/ $GALAXY_VIRTUAL_ENV/src/ /home/galaxy/.cache/ /home/galaxy/.npm
-
-RUN touch /var/log/condor/StartLog /var/log/condor/StarterLog /var/log/condor/CollectorLog /var/log/condor/NegotiatorLog && \
-    mkdir -p /var/run/condor/ /var/lock/condor/ && \
-    chown -R condor: /var/log/condor/StartLog /var/log/condor/StarterLog /var/log/condor/CollectorLog /var/log/condor/NegotiatorLog /var/run/condor/ /var/lock/condor/
 
 # The following commands will be executed as the galaxy user
 USER $GALAXY_USER
@@ -306,9 +317,6 @@ RUN chmod +x /usr/bin/install-tools /usr/bin/install-biojs && \
     cd /usr/bin/ && curl https://git.embl.de/grp-gbcs/galaxy-dir-sync/raw/master/src/galaxy-dir-sync.py > galaxy-dir-sync.py && \
     chmod +x galaxy-dir-sync.py
 
-RUN echo "DISCARD_SESSION_KEYRING_ON_STARTUP=False" > /etc/condor/condor_config.local && \
-    echo "TRUST_UID_DOMAIN=true" >> /etc/condor/condor_config.local
-
 # use https://github.com/krallin/tini/ as tiny but valid init and PID 1
 ADD https://github.com/krallin/tini/releases/download/v0.18.0/tini /sbin/tini
 RUN chmod +x /sbin/tini
@@ -335,7 +343,7 @@ ENV SUPERVISOR_POSTGRES_AUTOSTART=True \
     SUPERVISOR_MANAGE_PROFTP=True \
     SUPERVISOR_MANAGE_REPORTS=True \
     SUPERVISOR_MANAGE_IE_PROXY=True \
-    SUPERVISOR_MANAGE_CONDOR=True \
+    SUPERVISOR_MANAGE_CONDOR=False \
     SUPERVISOR_MANAGE_SLURM= \
     HOST_DOCKER_LEGACY= \
     GALAXY_EXTRAS_CONFIG_POSTGRES=True \
