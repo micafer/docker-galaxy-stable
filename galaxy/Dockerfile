@@ -110,9 +110,9 @@ RUN groupadd -r postgres -g $GALAXY_POSTGRES_GID \
 
 # installing more recend SLURM
 RUN apt update -qq && apt install --no-install-recommends -y wget gcc make libc6-dev && \
-    wget -q http://ftpgrycap.i3m.upv.es/src/slurm-16.05.11.tar.bz2 && \
-    tar xf slurm-16.05.11.tar.bz2 && \
-    cd slurm-16.05.11 && \
+    wget -q http://ftpgrycap.i3m.upv.es/src/slurm-20.02.6.tar.bz2 && \
+    tar xf slurm-20.02.6.tar.bz2 && \
+    cd slurm-20.02.6 && \
     ./configure --prefix=/usr --sysconfdir=/etc/slurm-llnl --with-munge=/usr && \
     make && \
     make install && \
