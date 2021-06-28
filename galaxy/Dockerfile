@@ -91,8 +91,8 @@ RUN groupadd -r postgres -g $GALAXY_POSTGRES_GID \
     ## && apt-get install postgresql-10 --no-install-recommends -y \
     && apt-get install nginx-extras nginx-common --no-install-recommends -y \
     && apt-get install docker-ce-cli --no-install-recommends -y \
-    && apt-get install slurm-client slurmd slurmctld slurm-drmaa1 --no-install-recommends -y \
-    && ln -s /usr/lib/slurm-drmaa/lib/libdrmaa.so.1 /usr/lib/slurm-drmaa/lib/libdrmaa.so \
+#    && apt-get install slurm-client slurmd slurmctld slurm-drmaa1 --no-install-recommends -y \
+#    && ln -s /usr/lib/slurm-drmaa/lib/libdrmaa.so.1 /usr/lib/slurm-drmaa/lib/libdrmaa.so \
     && apt-get install proftpd proftpd-mod-pgsql --no-install-recommends -y \
     && apt-get install munge libmunge-dev --no-install-recommends -y \
     && apt-get install nano --no-install-recommends -y \
@@ -112,6 +112,26 @@ RUN groupadd -r postgres -g $GALAXY_POSTGRES_GID \
     # cleanup dance
     && find /usr/lib/ -name '*.pyc' -delete \
     && rm -rf /tmp/* /root/.cache/ /var/cache/* $GALAXY_ROOT/client/node_modules/ $GALAXY_VIRTUAL_ENV/src/ /home/galaxy/.cache/ /home/galaxy/.npm/
+
+
+# installing more recend SLURM
+RUN apt update -qq && apt install --no-install-recommends -y wget gcc make libc6-dev && \
+    wget -q http://ftpgrycap.i3m.upv.es/src/slurm-20.02.7.tar.bz2 && \
+    tar xf slurm-20.02.7.tar.bz2 && \
+    cd slurm-20.02.7 && \
+    ./configure --prefix=/usr --sysconfdir=/etc/slurm-llnl --with-munge=/usr && \
+    make && \
+    make install && \
+    cd .. && \
+    wget -q https://github.com/natefoo/slurm-drmaa/releases/download/1.1.2/slurm-drmaa-1.1.2.tar.gz && \
+    tar xf slurm-drmaa-1.1.2.tar.gz  && \
+    cd slurm-drmaa-1.1.2 && \
+    ./configure --with-slurm-inc=/usr/include --with-slurm-lib=/usr/lib --sysconfdir=/etc && \
+    make && \
+    make install && \
+    rm -rf /slurm* && \
+    apt-get purge -y gcc make libc6-dev && \
+    apt-get autoremove -y && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /var/cache/* ~/.cache/
 
 ADD ./bashrc $GALAXY_HOME/.bashrc
 
