@@ -115,7 +115,7 @@ RUN groupadd -r postgres -g $GALAXY_POSTGRES_GID \
 
 
 # installing more recend SLURM
-RUN apt update -qq && apt install --no-install-recommends -y wget gcc make libc6-dev && \
+RUN apt update -qq && apt install --no-install-recommends -y wget gcc make libc6-dev python3-minimal && \
     wget -q http://ftpgrycap.i3m.upv.es/src/slurm-20.02.7.tar.bz2 && \
     tar xf slurm-20.02.7.tar.bz2 && \
     cd slurm-20.02.7 && \
@@ -130,7 +130,7 @@ RUN apt update -qq && apt install --no-install-recommends -y wget gcc make libc6
     make && \
     make install && \
     rm -rf /slurm* && \
-    apt-get purge -y gcc make libc6-dev && \
+    apt-get purge -y gcc make libc6-dev python3-minimal && \
     apt-get autoremove -y && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /var/cache/* ~/.cache/
 
 ADD ./bashrc $GALAXY_HOME/.bashrc
