@@ -116,9 +116,9 @@ RUN groupadd -r postgres -g $GALAXY_POSTGRES_GID \
 
 # installing more recend SLURM
 RUN apt update -qq && apt install --no-install-recommends -y wget gcc make libc6-dev python3-minimal && \
-    wget -q http://ftpgrycap.i3m.upv.es/src/slurm-20.02.7.tar.bz2 && \
-    tar xf slurm-20.02.7.tar.bz2 && \
-    cd slurm-20.02.7 && \
+    wget -q http://ftpgrycap.i3m.upv.es/src/slurm-19.05.5.tar.bz2 && \
+    tar xf slurm-19.05.5.tar.bz2 && \
+    cd slurm-19.05.5 && \
     ./configure --prefix=/usr --sysconfdir=/etc/slurm-llnl --with-munge=/usr && \
     make && \
     make install && \
